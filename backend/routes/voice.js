@@ -268,14 +268,19 @@ router.post('/recording-complete', async (req, res) => {
 
         if (aiService) {
             try {
+                console.log(`[Voice] Starting STT for recording: ${RecordingUrl}`);
                 const sttResult = await aiService.speechToText(RecordingUrl);
                 transcriptText = sttResult.transcript || transcriptText;
+                console.log(`[Voice] STT transcript: "${transcriptText}"`);
                 const entities = await aiService.extractComplaintEntities(transcriptText);
                 intentCategory = entities.intentCategory || 'Other';
                 landmark = entities.landmark || '';
+                console.log(`[Voice] Extracted → Category: ${intentCategory}, Landmark: ${landmark}`);
             } catch (aiErr) {
-                console.warn('[Voice] AI processing failed, saving raw:', aiErr.message);
+                console.error('[Voice] AI processing failed, saving with placeholder:', aiErr.message);
             }
+        } else {
+            console.warn('[Voice] AI service not available, saving with placeholder text');
         }
 
         const ticket = new MasterTicket({

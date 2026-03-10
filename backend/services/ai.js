@@ -14,11 +14,16 @@ const SARVAM_API_KEY = process.env.SARVAM_API_KEY;
  */
 async function speechToText(audioUrl) {
     try {
-        // 1. Download Twilio Recording
+        // 1. Download Twilio Recording (requires auth + .wav extension)
+        const downloadUrl = audioUrl.endsWith('.wav') ? audioUrl : audioUrl + '.wav';
         const response = await axios({
             method: "get",
-            url: audioUrl,
-            responseType: "stream"
+            url: downloadUrl,
+            responseType: "stream",
+            auth: {
+                username: process.env.TWILIO_ACCOUNT_SID,
+                password: process.env.TWILIO_AUTH_TOKEN
+            }
         });
 
         // 2. Upload to Sarvam
