@@ -1,22 +1,32 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import DashboardLayout from "../../components/DashboardLayout";
 import api from "../../utils/api";
 import { TICKET_STATUSES } from "../../data/departments";
+import toast from "react-hot-toast";
 
 export default function MyComplaints() {
     const [complaints, setComplaints] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("all");
+    const fetchedRef = useRef(false);
 
     useEffect(() => {
+        if (fetchedRef.current) return;
+        fetchedRef.current = true;
+
         const fetchComplaints = async () => {
             try {
-                const { data } = await api.get('/tickets/my-complaints');
+                const { data } = await api.get('/tickets/my-complaints', { timeout: 30000 });
                 setComplaints(data);
             } catch (err) {
                 console.error("Error fetching complaints:", err);
+                const msg = err?.code === 'ECONNABORTED'
+                    ? "Complaints are taking longer than expected. Please wait and refresh."
+                    : (err?.response?.data?.message || "Could not load complaints. Please refresh.");
+                toast.error(msg);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
         fetchComplaints();
     }, []);

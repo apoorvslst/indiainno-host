@@ -1,0 +1,11 @@
+{
+  "status": 400,
+  "data": {
+    "RestException": {
+      "Status": 400,
+      "Message": "Bad or missing parameters in request.; ",
+      "Code": 34001
+    }
+  },
+  "message": "Request failed with status code 400"
+}

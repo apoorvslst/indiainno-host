@@ -1,0 +1,33 @@
+{
+  "page": 1,
+  "page_size": 50,
+  "uri": "https://twilix.exotel.com/v2_beta/Accounts/iiitkota1/IncomingPhoneNumbers?Page=1&PageSize=50",
+  "first_page_uri": "https://twilix.exotel.com/v2_beta/Accounts/iiitkota1/IncomingPhoneNumbers?Page=0&PageSize=50",
+  "next_page_uri": "https://twilix.exotel.com/v2_beta/Accounts/iiitkota1/IncomingPhoneNumbers?Page=2&PageSize=50",
+  "previous_page_uri": "https://twilix.exotel.com/v2_beta/Accounts/iiitkota1/IncomingPhoneNumbers?Page=1&PageSize=50",
+  "incoming_phone_numbers": [
+    {
+      "sid": "6853874b5b6416249682b356ed7cd30e",
+      "date_created": "2026-03-21 23:53:30",
+      "date_updated": "2026-03-21 23:53:30",
+      "account_sid": "iiitkota1",
+      "friendly_name": "08047360814",
+      "phone_number": "+918047360814",
+      "capabilities": {
+        "voice": true
+      },
+      "country": "IN",
+      "region": "KA",
+      "one_time_price": "0.000000",
+      "rental_price": "499.000000",
+      "incoming_rate": "0.000000",
+      "incoming_pulse": "60",
+      "currency": "INR",
+      "number_type": "Landline",
+      "vanity_number": false,
+      "voice_url": "https://my.exotel.com/iiitkota1/exoml/start_voice/1209351",
+      "sms_url": null,
+      "uri": "/v2/Accounts/iiitkota1/IncomingPhoneNumbers/6853874b5b6416249682b356ed7cd30e"
+    }
+  ]
+}
