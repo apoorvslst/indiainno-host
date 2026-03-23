@@ -26,6 +26,7 @@ const masterTicketSchema = new mongoose.Schema({
     city: { type: String, default: '' },
     audioUrl: { type: String, default: null },
     description: { type: String, default: '' },
+    source: { type: String, enum: ['web_form', 'voice_call', 'sms'], default: 'web_form' },
     ticketNumber: { type: String, unique: true },
     progressPercent: { type: Number, default: 0, min: 0, max: 100 },
     upvoters: [{
@@ -55,6 +56,9 @@ const rawComplaintSchema = new mongoose.Schema({
     status: { type: String, default: 'Open' },
     masterTicketId: { type: mongoose.Schema.Types.ObjectId, ref: 'MasterTicket' }
 }, { timestamps: true });
+
+// Speeds up dashboard and my-complaints queries by user and recency.
+rawComplaintSchema.index({ userId: 1, createdAt: -1 });
 
 const MasterTicket = mongoose.model('MasterTicket', masterTicketSchema);
 const RawComplaint = mongoose.model('RawComplaint', rawComplaintSchema);

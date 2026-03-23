@@ -67,8 +67,10 @@ export default function ManageTickets() {
                         <thead>
                             <tr>
                                 <th>ID</th>
+                                <th>Source</th>
                                 <th>Category</th>
                                 <th>Severity / Count</th>
+                                <th>Description</th>
                                 <th>Location</th>
                                 <th>Status</th>
                                 <th>Assignment</th>
@@ -76,13 +78,16 @@ export default function ManageTickets() {
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan="6" className="text-center py-8"><div className="spinner mx-auto" /></td></tr>
+                                <tr><td colSpan="8" className="text-center py-8"><div className="spinner mx-auto" /></td></tr>
                             ) : filteredTickets.length === 0 ? (
-                                <tr><td colSpan="6" className="text-center py-8 text-[var(--color-text-muted)]">No tickets found</td></tr>
+                                <tr><td colSpan="8" className="text-center py-8 text-[var(--color-text-muted)]">No tickets found</td></tr>
                             ) : (
                                 filteredTickets.map(t => (
                                     <tr key={t.id}>
                                         <td className="font-mono text-xs text-[var(--color-text-muted)]">{t.id.slice(0, 8)}</td>
+                                        <td className="text-center" title={t.source === 'voice_call' ? 'Voice Call' : t.source === 'sms' ? 'SMS' : 'Web Form'}>
+                                            {t.source === 'voice_call' ? '📞' : t.source === 'sms' ? '💬' : '📝'}
+                                        </td>
                                         <td className="font-medium text-sm">{t.intentCategory?.replace(/_/g, " ")}</td>
                                         <td>
                                             <div className="flex flex-col gap-1 items-start">
@@ -90,6 +95,7 @@ export default function ManageTickets() {
                                                 <span className="text-[10px] text-[var(--color-text-muted)]">{t.complaintCount} raw reports</span>
                                             </div>
                                         </td>
+                                        <td className="text-xs max-w-[200px] truncate text-[var(--color-text-muted)]" title={t.description}>{t.description || '—'}</td>
                                         <td className="text-sm max-w-[200px] truncate" title={t.landmark}>{t.landmark || (t.lat ? "Lat/Lng Pin" : "Pending Manual Fix")}</td>
                                         <td>
                                             <select

@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
+const fs = require('fs');
 const connectDB = require('./config/db');
 
 dotenv.config();
@@ -14,15 +16,50 @@ process.on('unhandledRejection', (reason) => {
     console.error('[UNHANDLED REJECTION] Server will continue running:', reason);
 });
 
+// Sanitize WEBHOOK_BASE_URL: strip any trailing slash to prevent double-slash in URLs
+if (process.env.WEBHOOK_BASE_URL) {
+    process.env.WEBHOOK_BASE_URL = process.env.WEBHOOK_BASE_URL.replace(/\/+$/, '');
+    console.log(`🔗 WEBHOOK_BASE_URL: ${process.env.WEBHOOK_BASE_URL}`);
+}
+
+const {
+    initiateCall,
+    getCallDetails,
+    pollForRecording,
+    processInboundRecording,
+    transcribeRecordingUrl,
+    getDigitalDemocracyReply,
+    synthesizeSpeech,
+    saveResponseAudio
+} = require('./services/exotelService');
+
+// Ensure public/responses directory exists before any request can hit us
+const responsesDir = path.join(__dirname, 'public', 'responses');
+fs.mkdirSync(responsesDir, { recursive: true });
+console.log(`📂 Ensured responses directory exists: ${responsesDir}`);
+
 const app = express();
 
 // Middleware
+const allowedOriginPatterns = [
+    /^http:\/\/localhost:\d+$/,
+    /^http:\/\/127\.0\.0\.1:\d+$/,
+    /^https:\/\/[a-z0-9-]+\.ngrok-free\.dev$/,
+    /^https:\/\/[a-z0-9-]+\.ngrok\.io$/
+];
+
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176', 'http://localhost:5177', 'http://localhost:5178'],
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        const isAllowed = allowedOriginPatterns.some((pattern) => pattern.test(origin));
+        if (isAllowed) return callback(null, true);
+        return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use('/public', express.static(path.join(__dirname, 'public')));
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -45,13 +82,130 @@ app.get('/', (req, res) => {
     });
 });
 
-// Config endpoint to fetch public settings without hardcoding (like twilio number)
+// Config endpoint to fetch public settings without hardcoding
 app.get('/api/config', (req, res) => {
     res.json({
         helplineNumber: process.env.EXOTEL_PHONE_NUMBER || process.env.TWILIO_PHONE_NUMBER || "Not Configured",
         exotelNumber: process.env.EXOTEL_PHONE_NUMBER || "Not Configured",
         webhookBase: process.env.WEBHOOK_BASE_URL || "http://localhost:5000"
     });
+});
+
+// Outbound call trigger for frontend button
+app.post('/initiate-call', async (req, res) => {
+    try {
+        const userPhoneNumber = req.body?.number;
+        if (!userPhoneNumber) {
+            return res.status(400).json({ message: 'Phone number is required in body as { number }' });
+        }
+
+        const call = await initiateCall(userPhoneNumber);
+        return res.json({
+            success: true,
+            message: 'Call initiated successfully',
+            callSid: call.sid,
+            from: call.from,
+            to: call.to,
+            url: call.url
+        });
+    } catch (error) {
+        const exotelMessage =
+            error?.response?.data?.RestException?.Message ||
+            error?.response?.data?.message ||
+            error.message;
+        console.error('[Exotel Initiate Call Error]', error?.response?.data || error.message);
+        return res.status(500).json({
+            success: false,
+            message: exotelMessage || 'Failed to initiate call',
+            detail: error?.response?.data || error.message
+        });
+    }
+});
+
+// In-memory set to prevent duplicate processing for the same call
+const processedCalls = new Set();
+
+// ──────────────────────────────────────────────────────────────
+// ROUTE: /incoming-handler — ExoML Webhook
+// ──────────────────────────────────────────────────────────────
+app.all('/incoming-handler', (req, res) => {
+    const callSid = req.query?.CallSid || req.body?.CallSid;
+    const callFrom = req.query?.CallFrom || req.body?.CallFrom || req.query?.From || req.body?.From;
+    const callTo = req.query?.CallTo || req.body?.CallTo || req.query?.To || req.body?.To;
+
+    console.log('\n\n===================================');
+    console.log('📞 INCOMING CALL (ExoML)');
+    console.log('===================================');
+
+    // Build the recording callback URL
+    const baseUrl = process.env.WEBHOOK_BASE_URL || 'http://localhost:5000';
+    const recordingDoneUrl = `${baseUrl}/recording-done`;
+
+    const exoml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say>Namaste! CivicSync mein aapka swagat hai. Kripya beep ke baad apni shikayat batayen. Samaapt karne ke liye hash dabayen.</Say>
+    <Record action="${recordingDoneUrl}" method="POST" maxLength="120" finishOnKey="#" playBeep="true" />
+    <Say>Dhanyawad! Aapki shikayat darj ho gayi hai. Hum jald se jald samaadhaan karenge.</Say>
+</Response>`;
+
+    res.set('Content-Type', 'text/xml');
+    res.status(200).send(exoml);
+});
+
+// ──────────────────────────────────────────────────────────────
+// ROUTE: /recording-done — ExoML Record action callback
+// ──────────────────────────────────────────────────────────────
+app.all('/recording-done', (req, res) => {
+    const callSid = req.query?.CallSid || req.body?.CallSid;
+    const callFrom = req.query?.CallFrom || req.body?.CallFrom || req.query?.From || req.body?.From;
+    const recordingUrl = req.query?.RecordingUrl || req.body?.RecordingUrl;
+
+    const exoml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say>Dhanyawad! Aapki shikayat darj ho gayi hai. Hum jald se jald samaadhaan karenge.</Say>
+    <Hangup />
+</Response>`;
+
+    res.set('Content-Type', 'text/xml');
+    res.status(200).send(exoml);
+
+    if (recordingUrl && callSid && !processedCalls.has(callSid)) {
+        processedCalls.add(callSid);
+        const callerPhone = callFrom || 'unknown';
+
+        (async () => {
+            try {
+                console.log(`\n🔄 [REC-DONE] Processing recording for ${callerPhone}...`);
+                const result = await processInboundRecording(recordingUrl, callerPhone);
+                console.log(`✅ [REC-DONE] Ticket created: ${result.ticketNumber}`);
+            } catch (err) {
+                console.error(`❌ [REC-DONE] Failed:`, err.message);
+            } finally {
+                setTimeout(() => processedCalls.delete(callSid), 10 * 60 * 1000);
+            }
+        })();
+    }
+});
+
+app.all('/call-status-callback', (req, res) => {
+    const callSid = req.query?.CallSid || req.body?.CallSid;
+    const callFrom = req.query?.CallFrom || req.body?.CallFrom || req.query?.From || req.body?.From;
+    const recordingUrl = req.query?.RecordingUrl || req.body?.RecordingUrl;
+
+    res.status(200).json({ status: 'received' });
+
+    if (recordingUrl && callSid && !processedCalls.has(callSid)) {
+        processedCalls.add(callSid);
+        (async () => {
+            try {
+                await processInboundRecording(recordingUrl, callFrom || 'unknown');
+            } catch (err) {
+                console.error(`❌ [STATUS-CB] Failed:`, err.message);
+            } finally {
+                setTimeout(() => processedCalls.delete(callSid), 10 * 60 * 1000);
+            }
+        })();
+    }
 });
 
 // Routes

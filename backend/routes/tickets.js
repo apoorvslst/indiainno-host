@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const { MasterTicket, RawComplaint } = require('../models/Ticket');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -126,13 +127,29 @@ router.post('/complaint', protect, async (req, res) => {
 router.get('/my-complaints', protect, async (req, res) => {
     try {
         const complaints = await RawComplaint.find({ userId: req.user._id })
-            .populate('masterTicketId')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean()
+            .maxTimeMS(10000);
+
+        const ticketIds = [...new Set(
+            complaints
+                .map(c => c.masterTicketId)
+                .filter(id => id && mongoose.Types.ObjectId.isValid(id))
+                .map(id => id.toString())
+        )];
+
+        const tickets = ticketIds.length
+            ? await MasterTicket.find({ _id: { $in: ticketIds } }).lean().maxTimeMS(10000)
+            : [];
+
+        const ticketMap = new Map(tickets.map(t => [t._id.toString(), t]));
 
         const enriched = complaints.map(c => ({
-            ...c.toObject(),
+            ...c,
             id: c._id,
-            ticket: c.masterTicketId ? { ...c.masterTicketId.toObject(), id: c.masterTicketId._id } : null
+            ticket: c.masterTicketId && ticketMap.has(c.masterTicketId.toString())
+                ? { ...ticketMap.get(c.masterTicketId.toString()), id: c.masterTicketId.toString() }
+                : null
         }));
         res.json(enriched);
     } catch (err) {

@@ -15,11 +15,15 @@ const SARVAM_API_KEY = process.env.SARVAM_API_KEY;
  */
 async function speechToText(audioUrl) {
     try {
-        // 1. Download recording from URL (Exotel / any provider)
+        // 1. Download recording audio. 
+        // Some providers (like Exotel) might need .wav appended if not present.
+        const downloadUrl = (audioUrl && !audioUrl.includes('.')) ? audioUrl + '.wav' : audioUrl;
+
+        console.log(`[Sarvam] Downloading audio from: ${downloadUrl}`);
         const response = await axios({
             method: "get",
-            url: audioUrl,
-            responseType: "arraybuffer",
+            url: downloadUrl,
+            responseType: "arraybuffer", // arraybuffer is more compatible with FormData + Buffer.from
             timeout: 30000,
         });
 

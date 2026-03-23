@@ -35,7 +35,7 @@ html {
 
 body {
   font-family: var(--font-sans);
-  background: #f1f5f9;
+  background: #f0f7fd;
   color: var(--color-text);
   min-height: 100vh;
   margin: 0;

@@ -2,7 +2,13 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
     try {
-        const conn = await mongoose.connect(process.env.MONGO_URI, {
+        // Build URI from separate env vars to avoid dotenv mangling special chars
+        const user = encodeURIComponent(process.env.MONGO_USER);
+        const pass = encodeURIComponent(process.env.MONGO_PASS);
+        const host = process.env.MONGO_HOST;
+        const uri = process.env.MONGO_URI || `mongodb+srv://${user}:${pass}@${host}/?appName=Cluster0`;
+
+        const conn = await mongoose.connect(uri, {
             dbName: 'civicsync'
         });
         console.log(`[MongoDB] Connected: ${conn.connection.host} | DB: ${conn.connection.name}`);
@@ -13,3 +19,4 @@ const connectDB = async () => {
 };
 
 module.exports = connectDB;
+
