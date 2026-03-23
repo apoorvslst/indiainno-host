@@ -6,7 +6,7 @@ let twilio, MessagingResponse;
 try {
     twilio = require('twilio');
     MessagingResponse = twilio.twiml.MessagingResponse;
-} catch (e) {
+} catch {
     console.warn('[SMS] Twilio SDK not available. SMS routes will return 503.');
 }
 

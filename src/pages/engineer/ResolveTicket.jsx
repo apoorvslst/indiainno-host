@@ -30,7 +30,7 @@ export default function ResolveTicket() {
                 const { data } = await api.get(`/tickets/master/${ticketId}`);
                 setTicket(data);
                 setForm(prev => ({ ...prev, progressPercent: data.progressPercent || 0 }));
-            } catch (err) {
+            } catch {
                 toast.error("Failed to load ticket");
                 navigate("/engineer");
             }
@@ -78,12 +78,11 @@ export default function ResolveTicket() {
             setSubmitting(true);
             try {
                 await api.put(`/tickets/master/${ticketId}`, {
-                    progressPercent: form.progressPercent,
-                    status: 'In_Progress'
+                    progressPercent: form.progressPercent
                 });
                 toast.success("Progress updated successfully!");
                 navigate("/engineer");
-            } catch (err) {
+            } catch {
                 toast.error("Failed to update progress.");
             }
             setSubmitting(false);

@@ -1,58 +1,115 @@
-const twilio = require('twilio');
 const dotenv = require('dotenv');
 
 dotenv.config();
 
-const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-const TWILIO_NUMBER = process.env.TWILIO_PHONE_NUMBER;
+const WEBHOOK_BASE = process.env.WEBHOOK_BASE_URL || 'http://localhost:5000';
 
 /**
- * Send SMS/WhatsApp Notification
+ * Validate that Twilio credentials are properly configured (not placeholders).
  */
-async function sendNotification(to, body) {
-    try {
-        const message = await client.messages.create({
-            body: body,
-            from: TWILIO_NUMBER,
-            to: to
-        });
-        console.log(`[Twilio] Message sent to ${to}: ${message.sid}`);
-        return message.sid;
-    } catch (err) {
-        console.error(`[Twilio Error] Failed to send to ${to}`, err.message);
+function isTwilioConfigured() {
+    const sid = process.env.TWILIO_ACCOUNT_SID || '';
+    const token = process.env.TWILIO_AUTH_TOKEN || '';
+    const phone = process.env.TWILIO_PHONE_NUMBER || '';
+
+    if (!sid || !token || !phone) return false;
+    // Twilio SIDs must start with 'AC'
+    if (!sid.startsWith('AC')) return false;
+    // Check for placeholder values
+    if (sid.includes('your_') || token.includes('your_') || phone.includes('your_')) return false;
+
+    return true;
+}
+
+function getTwilioClient() {
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
+
+    if (!isTwilioConfigured()) {
+        const missing = [];
+        if (!accountSid || !accountSid.startsWith('AC')) missing.push('TWILIO_ACCOUNT_SID (must start with AC)');
+        if (!authToken || authToken.includes('your_')) missing.push('TWILIO_AUTH_TOKEN');
+        if (!phoneNumber || phoneNumber.includes('your_')) missing.push('TWILIO_PHONE_NUMBER');
+        const err = new Error(`Twilio not configured properly: ${missing.join(', ')}. Get credentials from twilio.com/console`);
+        err.code = 'TWILIO_CONFIG_MISSING';
         throw err;
     }
+
+    // Only require twilio when we know credentials are valid
+    const twilio = require('twilio');
+    return {
+        client: twilio(accountSid, authToken),
+        phoneNumber
+    };
 }
 
 /**
- * Make an outbound call using inline TwiML (no webhook needed!)
- * Twilio reads the TwiML directly — no ngrok dependency for the IVR.
+ * Make an outbound call using Twilio.
+ * Uses inline TwiML with Language Selection IVR.
+ * User selects language → describes complaint → recording is processed.
  */
-async function makeCall(to, webhookBaseUrl) {
-    try {
-        // Build the full IVR TwiML inline so Twilio doesn't need to hit a webhook
-        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+async function makeCall(toNumber) {
+    const { client, phoneNumber } = getTwilioClient();
+
+    const languageSelectedUrl = `${WEBHOOK_BASE}/api/voice/language-selected`;
+    const recordingCallbackUrl = `${WEBHOOK_BASE}/api/voice/recording-complete`;
+
+    // Inline TwiML: greet → language selection → record complaint
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Gather numDigits="1" action="${webhookBaseUrl}/api/voice/select-language">
-        <Say voice="Polly.Aditi">Welcome to Civic Sync, the Government Grievance Redressal System. Please select your language. Press 1 for Hindi. Press 2 for English. Press 3 for Tamil. Press 4 for Telugu. Press 5 for Bengali. Press 6 for Marathi. Press 7 for Gujarati. Press 8 for Kannada. Press 9 for Malayalam.</Say>
+    <Say voice="Polly.Aditi">Welcome to Civic Sync, the Government Grievance Redressal System.</Say>
+    <Gather numDigits="1" action="${languageSelectedUrl}" method="POST" timeout="8">
+        <Say voice="Polly.Aditi">Please select your language.</Say>
+        <Say voice="Polly.Aditi">Press 1 for Hindi.</Say>
+        <Say voice="Polly.Aditi">Press 2 for English.</Say>
+        <Say voice="Polly.Aditi">Press 3 for Marathi.</Say>
+        <Say voice="Polly.Aditi">Press 4 for Tamil.</Say>
+        <Say voice="Polly.Aditi">Press 5 for Telugu.</Say>
+        <Say voice="Polly.Aditi">Press 6 for Kannada.</Say>
+        <Say voice="Polly.Aditi">Press 7 for Bengali.</Say>
     </Gather>
-    <Say voice="Polly.Aditi">We did not receive your input. Goodbye.</Say>
+    <Say voice="Polly.Aditi">No input received. You can speak in any language after the beep. Press hash when done.</Say>
+    <Record maxLength="120" playBeep="true" action="${recordingCallbackUrl}" finishOnKey="#" trim="trim-silence" />
+    <Say voice="Polly.Aditi">We did not receive your recording. Goodbye.</Say>
 </Response>`;
 
-        const call = await client.calls.create({
-            to: to,
-            from: TWILIO_NUMBER,
-            twiml: twiml,  // Use inline TwiML instead of URL
+    console.log(`[Twilio] Calling ${toNumber} from ${phoneNumber} with language selection IVR`);
+
+    const call = await client.calls.create({
+        to: toNumber,
+        from: phoneNumber,
+        twiml: twiml,
+        statusCallback: `${WEBHOOK_BASE}/api/voice/call-status`,
+        statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+    });
+
+    console.log(`[Twilio] Call initiated: ${call.sid}`);
+    return { callSid: call.sid };
+}
+
+/**
+ * Send an SMS notification via Twilio
+ */
+async function sendNotification(to, body) {
+    try {
+        const { client, phoneNumber } = getTwilioClient();
+        const message = await client.messages.create({
+            body: body,
+            from: phoneNumber,
+            to: to
         });
-        console.log(`[Twilio] Outbound call initiated to ${to}: ${call.sid}`);
-        return call.sid;
+        console.log(`[Twilio] SMS sent to ${to}: ${message.sid}`);
+        return message.sid;
     } catch (err) {
-        console.error(`[Twilio Error] Failed to call ${to}`, err.message);
+        console.error(`[Twilio] SMS failed to ${to}:`, err.message);
         throw err;
     }
 }
 
 module.exports = {
+    makeCall,
     sendNotification,
-    makeCall
+    getTwilioClient,
+    isTwilioConfigured
 };

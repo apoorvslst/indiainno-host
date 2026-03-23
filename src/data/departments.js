@@ -140,7 +140,6 @@ export const TICKET_STATUSES = [
     { value: "Pending_Verification", label: "Pending Verification", color: "#f97316" },
     { value: "Closed", label: "Closed", color: "#22c55e" },
     { value: "Disputed", label: "Disputed", color: "#ef4444" },
-    { value: "Awaiting_Sync", label: "Awaiting Sync", color: "#6b7280" },
     { value: "Invalid_Spam", label: "Invalid/Spam", color: "#9ca3af" },
 ];
 

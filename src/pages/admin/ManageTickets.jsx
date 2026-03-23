@@ -19,7 +19,7 @@ export default function ManageTickets() {
                 ]);
                 setTickets(tRes.data);
                 setEngineers(eRes.data);
-            } catch (err) {
+            } catch {
                 toast.error("Error loading data");
             }
             setLoading(false);
@@ -35,7 +35,7 @@ export default function ManageTickets() {
             });
             setTickets(tickets.map(t => t.id === ticketId ? { ...t, assignedEngineerId: { _id: engId }, status: engId ? "Assigned" : "Open" } : t));
             toast.success(engId ? "Engineer assigned" : "Unassigned ticket");
-        } catch (e) {
+        } catch {
             toast.error("Failed to assign");
         }
     };
@@ -45,7 +45,7 @@ export default function ManageTickets() {
             await api.put(`/tickets/master/${ticketId}`, { status: newStatus });
             setTickets(tickets.map(t => t.id === ticketId ? { ...t, status: newStatus } : t));
             toast.success("Status updated");
-        } catch (e) {
+        } catch {
             toast.error("Failed to update status");
         }
     };

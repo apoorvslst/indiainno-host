@@ -36,13 +36,15 @@ export default function UserDashboard() {
     }, []);
 
     const handleCallMe = async () => {
+        if (calling) return;
         setCalling(true);
+        toast.dismiss(); // Clear any existing toasts to prevent flood
         try {
             const { data } = await api.post('/voice/call-me');
             toast.success(data.message || "Call initiated! Your phone will ring shortly.", { duration: 6000, icon: '📞' });
         } catch (err) {
-            const msg = err.response?.data?.message || "Failed to initiate call.";
-            toast.error(msg, { duration: 8000 });
+            const msg = err.response?.data?.message || "Failed to initiate call. Please try again.";
+            toast.error(msg, { duration: 6000, id: 'call-error' });
         }
         setCalling(false);
     };
@@ -84,8 +86,11 @@ export default function UserDashboard() {
             </div>
 
             <div className="bg-[#ecfdf5] border border-[#a7f3d0] rounded-xl p-4 mb-8 animate-fadeInUp">
+                <p className="text-[#065f46] text-xs mb-2">
+                    <strong>📞 How it works:</strong> Click "Contact Authorities" and we'll call your registered phone number. Select your language, describe your complaint in any Indian language — our AI will automatically transcribe, classify the department, and register your complaint. It will appear on your dashboard instantly!
+                </p>
                 <p className="text-[#065f46] text-xs">
-                    <strong>📞 How it works:</strong> Click "Contact Authorities" and we'll call your registered phone number. You can then select your language, choose department & city, and describe your issue via voice. Multilingual AI handles the rest!
+                    <strong>☎️ Toll-Free Helpline:</strong> You can also dial <strong style={{ fontSize: '13px', letterSpacing: '0.5px' }}>918047360814</strong> directly from any phone. Our system will call you back and register your complaint automatically.
                 </p>
             </div>
 

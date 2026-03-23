@@ -8,6 +8,7 @@ const NAV_LINKS = {
         { to: "/citizen", label: "Dashboard", icon: "📊" },
         { to: "/citizen/submit", label: "Submit Complaint", icon: "📝" },
         { to: "/citizen/complaints", label: "My Complaints", icon: "📋" },
+        { to: "/citizen/map", label: "City Map", icon: "🗺️" },
     ],
     engineer: [
         { to: "/engineer", label: "Dashboard", icon: "🔧" },

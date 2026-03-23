@@ -6,7 +6,7 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 // @route   GET /api/users
 // @desc    Get users (filter by ?role=engineer etc.)
 // @access  Admin/Engineer (protected)
-router.get('/', protect, async (req, res) => {
+router.get('/', protect, authorize('admin'), async (req, res) => {
     try {
         const query = {};
         if (req.query.role) query.role = req.query.role;
@@ -26,7 +26,7 @@ router.get('/', protect, async (req, res) => {
 // @route   GET /api/users/:id
 // @desc    Get single user profile
 // @access  Admin
-router.get('/:id', protect, async (req, res) => {
+router.get('/:id', protect, authorize('admin'), async (req, res) => {
     try {
         const user = await User.findById(req.params.id).select('-password');
         if (!user) return res.status(404).json({ message: 'User not found' });

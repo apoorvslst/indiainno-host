@@ -6,6 +6,7 @@ import Register from "./pages/Register";
 import UserDashboard from "./pages/user/UserDashboard";
 import SubmitComplaint from "./pages/user/SubmitComplaint";
 import MyComplaints from "./pages/user/MyComplaints";
+import CityMap from "./pages/user/CityMap";
 import EngineerDashboard from "./pages/engineer/EngineerDashboard";
 import ResolveTicket from "./pages/engineer/ResolveTicket";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -47,6 +48,7 @@ export default function App() {
       <Route path="/citizen" element={<ProtectedRoute allowedRoles={["user"]}><UserDashboard /></ProtectedRoute>} />
       <Route path="/citizen/submit" element={<ProtectedRoute allowedRoles={["user"]}><SubmitComplaint /></ProtectedRoute>} />
       <Route path="/citizen/complaints" element={<ProtectedRoute allowedRoles={["user"]}><MyComplaints /></ProtectedRoute>} />
+      <Route path="/citizen/map" element={<ProtectedRoute allowedRoles={["user"]}><CityMap /></ProtectedRoute>} />
 
       {/* Engineer Routes */}
       <Route path="/engineer" element={<ProtectedRoute allowedRoles={["engineer"]}><EngineerDashboard /></ProtectedRoute>} />

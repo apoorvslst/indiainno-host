@@ -12,7 +12,7 @@ export default function ManageEngineers() {
             try {
                 const { data } = await api.get('/users?role=engineer');
                 setEngineers(data);
-            } catch (err) {
+            } catch {
                 toast.error("Failed to fetch engineers");
             }
             setLoading(false);
@@ -25,7 +25,7 @@ export default function ManageEngineers() {
             await api.put(`/users/${id}`, updates);
             setEngineers(engineers.map(e => e._id === id ? { ...e, ...updates } : e));
             toast.success("Updated successfully");
-        } catch (err) {
+        } catch {
             toast.error("Update failed");
         }
     };

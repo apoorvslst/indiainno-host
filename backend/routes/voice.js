@@ -1,14 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const { MasterTicket, RawComplaint } = require('../models/Ticket');
-
-let twilio, VoiceResponse;
-try {
-    twilio = require('twilio');
-    VoiceResponse = twilio.twiml.VoiceResponse;
-} catch (e) {
-    console.warn('[Voice] Twilio SDK not available. Voice routes will return 503.');
-}
+const User = require('../models/User');
+const { protect } = require('../middleware/authMiddleware');
 
 let aiService;
 try {
@@ -17,439 +12,606 @@ try {
     console.warn('[Voice] AI service not available:', e.message);
 }
 
-// ── Language Options ──
-const LANGUAGES = {
-    '1': { code: 'hi', name: 'Hindi', voice: 'Polly.Aditi' },
-    '2': { code: 'en', name: 'English', voice: 'Polly.Joanna' },
-    '3': { code: 'ta', name: 'Tamil', voice: 'Polly.Aditi' },
-    '4': { code: 'te', name: 'Telugu', voice: 'Polly.Aditi' },
-    '5': { code: 'bn', name: 'Bengali', voice: 'Polly.Aditi' },
-    '6': { code: 'mr', name: 'Marathi', voice: 'Polly.Aditi' },
-    '7': { code: 'gu', name: 'Gujarati', voice: 'Polly.Aditi' },
-    '8': { code: 'kn', name: 'Kannada', voice: 'Polly.Aditi' },
-    '9': { code: 'ml', name: 'Malayalam', voice: 'Polly.Aditi' },
-};
+// ── In-memory mapping: phone/CallSid → userId (links calls to logged-in citizens) ──
+const callUserMap = {};
 
-// ── Departments (matches frontend departments.js) ──
-const DEPARTMENTS = [
-    { digit: '1', id: 'pwd', name: 'Public Works Department' },
-    { digit: '2', id: 'water_supply', name: 'Water Supply and Sewerage' },
-    { digit: '3', id: 'municipal', name: 'Municipal Corporation' },
-    { digit: '4', id: 'electricity', name: 'Electricity Board' },
-    { digit: '5', id: 'transport', name: 'Roads and Transport' },
-    { digit: '6', id: 'health', name: 'Health Department' },
-    { digit: '7', id: 'police', name: 'Police Department' },
-    { digit: '8', id: 'environment', name: 'Environment and Pollution Control' },
-    { digit: '9', id: 'education', name: 'Education Department' },
-];
+const WEBHOOK_BASE = process.env.WEBHOOK_BASE_URL || 'http://localhost:5000';
 
-// ── Cities ──
-const CITIES = [
-    { digit: '1', name: 'Jaipur' },
-    { digit: '2', name: 'Delhi' },
-    { digit: '3', name: 'Mumbai' },
-    { digit: '4', name: 'Bangalore' },
-    { digit: '5', name: 'Hyderabad' },
-    { digit: '6', name: 'Chennai' },
-    { digit: '7', name: 'Kolkata' },
-    { digit: '8', name: 'Lucknow' },
-    { digit: '9', name: 'Pune' },
-];
-
-// In-memory session store for multi-step call state
-const callSessions = {};
-
-function getVoice(session) {
-    return session?.voice || 'Polly.Aditi';
+// Helper: Build XML response (works for both Twilio TwiML and Exotel)
+function xmlResponse(innerXml) {
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n${innerXml}\n</Response>`;
 }
 
-// =============================================
-// STEP 1: Welcome — Select Language
-// =============================================
-router.post('/incoming', (req, res) => {
-    if (!VoiceResponse) return res.status(503).json({ message: 'Twilio not configured' });
-
-    const callSid = req.body.CallSid;
-    callSessions[callSid] = {}; // initialize session
-
-    const twiml = new VoiceResponse();
-    const gather = twiml.gather({ numDigits: 1, action: '/api/voice/select-language' });
-    gather.say({ voice: 'Polly.Aditi' },
-        'Welcome to Civic Sync, the Government Grievance Redressal System. ' +
-        'Please select your language. ' +
-        'Press 1 for Hindi. Press 2 for English. Press 3 for Tamil. ' +
-        'Press 4 for Telugu. Press 5 for Bengali. Press 6 for Marathi. ' +
-        'Press 7 for Gujarati. Press 8 for Kannada. Press 9 for Malayalam.'
-    );
-    twiml.say({ voice: 'Polly.Aditi' }, 'We did not receive your input.');
-    twiml.redirect('/api/voice/incoming');
-
-    res.type('text/xml').send(twiml.toString());
-});
+// Language config for IVR
+const LANGUAGES = {
+    '1': { name: 'Hindi', code: 'hi', greeting: 'Kripya apni shikayat spasht roop se batayein, sthan ya landmark bhi batayein. Hash key dabayein jab aap ho jayein.' },
+    '2': { name: 'English', code: 'en', greeting: 'Please describe your complaint clearly, including the location or landmark. Press the hash key when you are done.' },
+    '3': { name: 'Marathi', code: 'mr', greeting: 'Krupaya tumchi takraar spashta sanga, sthan kinva landmark suddha sanga. Zhalyavar hash key daba.' },
+    '4': { name: 'Tamil', code: 'ta', greeting: 'Dayavu seydhu ungal pugazhchiyai thelivaga koorungal. Idam matrrum landmark aiyum koorungal. Mudinthathum hash key azuthungal.' },
+    '5': { name: 'Telugu', code: 'te', greeting: 'Dayachesi mee phiryaadunu spastamga cheppandi. Sthalam mariyu landmark kuda cheppandi. Ayyaka hash key noppandi.' },
+    '6': { name: 'Kannada', code: 'kn', greeting: 'Dayavittu nimma durudarige spashta aagi helhi. Sthala mattu landmark kuda helhi. Mugidaga hash key onnhi.' },
+    '7': { name: 'Bengali', code: 'bn', greeting: 'Doya kore apnar obhijog porishkar bhabe bolun. Sthan ba landmark o bolun. Shesh hole hash key dabun.' },
+};
 
 // =============================================
-// STEP 2: Language selected — Choose Action
+// POST /api/voice/call-me — OUTBOUND via TWILIO
+// Citizen clicks "Contact Authorities" in web app.
+// Twilio calls their registered phone with Language Selection IVR.
 // =============================================
-router.post('/select-language', (req, res) => {
-    if (!VoiceResponse) return res.status(503).json({ message: 'Twilio not configured' });
-
-    const callSid = req.body.CallSid;
-    const digit = req.body.Digits;
-    const lang = LANGUAGES[digit];
-
-    if (!lang) {
-        const twiml = new VoiceResponse();
-        twiml.say({ voice: 'Polly.Aditi' }, 'Invalid selection. Please try again.');
-        twiml.redirect('/api/voice/incoming');
-        return res.type('text/xml').send(twiml.toString());
-    }
-
-    // Save language in session
-    if (!callSessions[callSid]) callSessions[callSid] = {};
-    callSessions[callSid].language = lang.code;
-    callSessions[callSid].languageName = lang.name;
-    callSessions[callSid].voice = lang.voice;
-
-    const voice = lang.voice;
-    const twiml = new VoiceResponse();
-    twiml.say({ voice }, `You selected ${lang.name}.`);
-
-    const gather = twiml.gather({ numDigits: 1, action: '/api/voice/select-action' });
-    gather.say({ voice },
-        'Press 1 to register a new complaint. Press 2 to enquire about an existing complaint.'
-    );
-    twiml.say({ voice }, 'We did not receive your input.');
-    twiml.redirect('/api/voice/incoming');
-
-    res.type('text/xml').send(twiml.toString());
-});
-
-// =============================================
-// STEP 3: Action selected — Route to complaint or enquiry
-// =============================================
-router.post('/select-action', (req, res) => {
-    if (!VoiceResponse) return res.status(503).json({ message: 'Twilio not configured' });
-
-    const callSid = req.body.CallSid;
-    const session = callSessions[callSid] || {};
-    const voice = getVoice(session);
-    const twiml = new VoiceResponse();
-
-    if (req.body.Digits === '1') {
-        // Register complaint → select department
-        const gather = twiml.gather({ numDigits: 1, action: '/api/voice/select-department' });
-        gather.say({ voice },
-            'Please select the department. ' +
-            'Press 1 for Public Works. Press 2 for Water Supply. Press 3 for Municipal Corporation. ' +
-            'Press 4 for Electricity. Press 5 for Roads and Transport. Press 6 for Health. ' +
-            'Press 7 for Police. Press 8 for Environment. Press 9 for Education.'
-        );
-        twiml.say({ voice }, 'No input received.');
-        twiml.redirect('/api/voice/incoming');
-    } else if (req.body.Digits === '2') {
-        // Enquire → enter ticket number
-        const gather = twiml.gather({ numDigits: 6, action: '/api/voice/enquire', timeout: 10 });
-        gather.say({ voice }, 'Please enter the 6 digit number from your ticket. For example, if your ticket is T K T dash 1 2 3 4 5 6, enter 1 2 3 4 5 6.');
-        twiml.say({ voice }, 'No input received. Goodbye.');
-    } else {
-        twiml.say({ voice }, 'Invalid option.');
-        twiml.redirect('/api/voice/incoming');
-    }
-
-    res.type('text/xml').send(twiml.toString());
-});
-
-// =============================================
-// STEP 4a: Department selected → Select City
-// =============================================
-router.post('/select-department', (req, res) => {
-    if (!VoiceResponse) return res.status(503).json({ message: 'Twilio not configured' });
-
-    const callSid = req.body.CallSid;
-    const session = callSessions[callSid] || {};
-    const voice = getVoice(session);
-    const digit = req.body.Digits;
-    const dept = DEPARTMENTS.find(d => d.digit === digit);
-
-    if (!dept) {
-        const twiml = new VoiceResponse();
-        twiml.say({ voice }, 'Invalid department. Please try again.');
-        twiml.redirect('/api/voice/incoming');
-        return res.type('text/xml').send(twiml.toString());
-    }
-
-    // Save department in session
-    session.department = dept.id;
-    session.departmentName = dept.name;
-    callSessions[callSid] = session;
-
-    const twiml = new VoiceResponse();
-    twiml.say({ voice }, `You selected ${dept.name}.`);
-
-    const gather = twiml.gather({ numDigits: 1, action: '/api/voice/select-city' });
-    gather.say({ voice },
-        'Now select your city. ' +
-        'Press 1 for Jaipur. Press 2 for Delhi. Press 3 for Mumbai. ' +
-        'Press 4 for Bangalore. Press 5 for Hyderabad. Press 6 for Chennai. ' +
-        'Press 7 for Kolkata. Press 8 for Lucknow. Press 9 for Pune.'
-    );
-    twiml.say({ voice }, 'No input received.');
-    twiml.redirect('/api/voice/incoming');
-
-    res.type('text/xml').send(twiml.toString());
-});
-
-// =============================================
-// STEP 4b: City selected → Record Voice Issue
-// =============================================
-router.post('/select-city', (req, res) => {
-    if (!VoiceResponse) return res.status(503).json({ message: 'Twilio not configured' });
-
-    const callSid = req.body.CallSid;
-    const session = callSessions[callSid] || {};
-    const voice = getVoice(session);
-    const digit = req.body.Digits;
-    const city = CITIES.find(c => c.digit === digit);
-
-    if (!city) {
-        const twiml = new VoiceResponse();
-        twiml.say({ voice }, 'Invalid city. Please try again.');
-        twiml.redirect('/api/voice/incoming');
-        return res.type('text/xml').send(twiml.toString());
-    }
-
-    // Save city in session
-    session.city = city.name;
-    callSessions[callSid] = session;
-
-    const twiml = new VoiceResponse();
-    twiml.say({ voice }, `City set to ${city.name}. Now please describe your complaint and the exact location or landmark after the beep. Press any key when finished.`);
-    twiml.record({
-        maxLength: 60,
-        playBeep: true,
-        action: '/api/voice/recording-complete',
-        trim: 'trim-silence'
-    });
-
-    res.type('text/xml').send(twiml.toString());
-});
-
-// =============================================
-// STEP 5: Recording complete → Process & store
-// =============================================
-router.post('/recording-complete', async (req, res) => {
-    if (!VoiceResponse) return res.status(503).json({ message: 'Twilio not configured' });
-
-    const { RecordingUrl, CallSid, Caller } = req.body;
-    const session = callSessions[CallSid] || {};
-    const voice = getVoice(session);
-
-    if (!RecordingUrl) {
-        const twiml = new VoiceResponse();
-        twiml.say({ voice }, 'Sorry, we did not capture your recording. Goodbye.');
-        return res.type('text/xml').send(twiml.toString());
-    }
-
-    // Respond immediately
-    const twiml = new VoiceResponse();
-    twiml.say({ voice }, 'Thank you. Your complaint has been registered. You will receive an SMS with your ticket number shortly. Goodbye.');
-    res.type('text/xml').send(twiml.toString());
-
-    // ── Async processing ──
-    try {
-        console.log(`[Voice] Processing ${CallSid} from ${Caller} | Lang: ${session.languageName} | Dept: ${session.departmentName} | City: ${session.city}`);
-
-        const crypto = require('crypto');
-        const callerHash = crypto.createHash('sha256').update(Caller || "unknown").digest('hex');
-
-        let transcriptText = 'Voice complaint (transcription pending)';
-        let intentCategory = 'Other';
-        let landmark = '';
-
-        if (aiService) {
-            try {
-                const sttResult = await aiService.speechToText(RecordingUrl);
-                transcriptText = sttResult.transcript || transcriptText;
-                const entities = await aiService.extractComplaintEntities(transcriptText);
-                intentCategory = entities.intentCategory || 'Other';
-                landmark = entities.landmark || '';
-            } catch (aiErr) {
-                console.warn('[Voice] AI processing failed, saving raw:', aiErr.message);
-            }
-        }
-
-        const ticket = new MasterTicket({
-            intentCategory,
-            description: transcriptText,
-            severity: "Low",
-            complaintCount: 1,
-            status: "Open",
-            needsManualGeo: true,
-            landmark: landmark || "From voice call - needs manual review",
-            audioUrl: RecordingUrl,
-            department: session.department || null,
-            city: session.city || "",
-            source: 'voice_call'
-        });
-        await ticket.save();
-
-        const rawComplaint = new RawComplaint({
-            callerPhone: callerHash,
-            callerPhoneRaw: Caller || "",
-            audioUrl: RecordingUrl,
-            status: 'Open',
-            source: 'voice_call',
-            transcriptOriginal: transcriptText,
-            transcriptEnglish: transcriptText,
-            intentCategory,
-            extractedLandmark: landmark,
-            department: session.department || null,
-            masterTicketId: ticket._id
-        });
-        await rawComplaint.save();
-
-        // Send SMS with ticket number
-        try {
-            const twilioService = require('../services/twilio');
-            await twilioService.sendNotification(
-                Caller,
-                `CivicSync: Your complaint is registered.\n` +
-                `Ticket: ${ticket.ticketNumber}\n` +
-                `Department: ${session.departmentName || 'General'}\n` +
-                `City: ${session.city || 'N/A'}\n` +
-                `Language: ${session.languageName || 'N/A'}\n` +
-                `Call this number again and press 2, then enter ${ticket.ticketNumber?.replace('TKT-', '')} to check status anytime.`
-            );
-        } catch (smsErr) {
-            console.error('[Voice] SMS failed:', smsErr.message);
-        }
-
-        // Clean up session
-        delete callSessions[CallSid];
-
-    } catch (err) {
-        console.error("[Voice Pipeline Failure]", err);
-    }
-});
-
-// =============================================
-// ENQUIRE: Ticket status lookup by number
-// =============================================
-router.post('/enquire', async (req, res) => {
-    if (!VoiceResponse) return res.status(503).json({ message: 'Twilio not configured' });
-
-    const callSid = req.body.CallSid;
-    const session = callSessions[callSid] || {};
-    const voice = getVoice(session);
-    const twiml = new VoiceResponse();
-    const digits = req.body.Digits;
-
-    try {
-        const ticketNumber = `TKT-${digits}`;
-        const ticket = await MasterTicket.findOne({ ticketNumber });
-
-        if (!ticket) {
-            twiml.say({ voice }, `Sorry, we could not find a ticket with number ${digits}. Please check and try again.`);
-            twiml.redirect('/api/voice/incoming');
-        } else {
-            const statusStr = ticket.status.replace(/_/g, " ");
-            const progress = ticket.progressPercent || 0;
-            const dept = ticket.department || 'Not assigned';
-            const city = ticket.city || 'Not specified';
-
-            twiml.say({ voice },
-                `Ticket ${digits} found. ` +
-                `Status: ${statusStr}. ` +
-                `Department: ${dept}. ` +
-                `City: ${city}. ` +
-                `Repair progress: ${progress} percent. ` +
-                (progress === 100 ? 'The issue has been resolved. ' : '') +
-                'Thank you for calling Civic Sync. Goodbye.'
-            );
-        }
-    } catch (e) {
-        console.error('[Voice Enquire Error]', e);
-        twiml.say({ voice }, 'There was a system error. Please try again later.');
-    }
-
-    // Cleanup session
-    delete callSessions[callSid];
-    res.type('text/xml').send(twiml.toString());
-});
-
-// =============================================
-// POST /api/voice/call-me — Citizen requests a call back
-// =============================================
-const { protect } = require('../middleware/authMiddleware');
-
 router.post('/call-me', protect, async (req, res) => {
     try {
-        // For demo: always call the demo number from .env
-        // In production: use req.user.phone instead
-        const DEMO_PHONE = process.env.DEMO_PHONE_NUMBER;
-        let formattedPhone = DEMO_PHONE || req.user.phone;
+        const useDemoPhone = process.env.USE_DEMO_PHONE === 'true';
+        const demoPhone = process.env.DEMO_PHONE_NUMBER;
+        const userPhone = req.user.phone;
+
+        const targetPhone = useDemoPhone
+            ? (demoPhone || userPhone)
+            : (userPhone || demoPhone);
+        let formattedPhone = targetPhone;
 
         if (!formattedPhone || formattedPhone.length < 10) {
             return res.status(400).json({
-                message: 'No valid phone number configured. Please update your phone number.',
+                message: 'No valid phone number on your account. Please update your phone number in profile.',
                 needsPhone: true
             });
         }
 
-        // Format phone number - ensure it starts with +
-        formattedPhone = formattedPhone.trim();
-        if (!formattedPhone.startsWith('+')) {
-            formattedPhone = formattedPhone.replace(/^0+/, '');
-            if (!formattedPhone.startsWith('91')) {
-                formattedPhone = '91' + formattedPhone;
-            }
-            formattedPhone = '+' + formattedPhone;
-        }
+        // Normalize to E.164 +91XXXXXXXXXX
+        formattedPhone = normalizePhone(formattedPhone);
 
-        const webhookBase = process.env.WEBHOOK_BASE_URL;
-        if (!webhookBase) {
-            return res.status(500).json({
-                message: 'Server webhook URL not configured. Admin needs to set WEBHOOK_BASE_URL in .env (ngrok URL).',
-                errorCode: 'NO_WEBHOOK_URL'
-            });
-        }
+        // Store user mapping so we can link the complaint later
+        callUserMap[formattedPhone] = {
+            userId: req.user._id,
+            userName: req.user.name,
+            userEmail: req.user.email,
+            userCity: req.user.city || '',
+            timestamp: Date.now(),
+            source: 'web_contact_authorities'
+        };
 
+        console.log(`[Voice] Outbound call request from ${req.user.email} → ${formattedPhone} (via Twilio)`);
+
+        // Use TWILIO for outbound calls
         const twilioService = require('../services/twilio');
-        const callSid = await twilioService.makeCall(formattedPhone, webhookBase);
+        const call = await twilioService.makeCall(formattedPhone);
+
+        // Map CallSid to user as well
+        if (call.callSid) {
+            callUserMap[call.callSid] = callUserMap[formattedPhone];
+        }
 
         res.json({
             success: true,
             message: `Call initiated! Your phone (${formattedPhone}) will ring shortly.`,
-            callSid
+            callSid: call.callSid,
+            provider: 'twilio'
         });
 
     } catch (err) {
         console.error('[Call-Me Error]', err);
 
-        // Provide user-friendly Twilio error messages
         let userMessage = 'Failed to initiate call. Please try again.';
-        if (err.code === 21214 || err.code === 21217) {
-            userMessage = 'Your phone number is not verified with Twilio trial account. Ask admin to verify it or upgrade to a paid Twilio plan.';
-        } else if (err.code === 21210) {
-            userMessage = 'The Twilio phone number is not configured correctly.';
+        let errorCode = 'CALL_INIT_FAILED';
+
+        if (err.code === 'TWILIO_CONFIG_MISSING') {
+            userMessage = 'Calling service is not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in backend/.env';
+            errorCode = err.code;
+        } else if (err.code === 20003) {
+            userMessage = 'Twilio authentication failed. Check your TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN.';
+            errorCode = 'TWILIO_AUTH_FAILED';
+        } else if (err.code === 21211 || err.code === 21214) {
+            userMessage = 'Invalid phone number. Please update your phone number in profile (e.g. +919876543210).';
+            errorCode = 'INVALID_PHONE';
+        } else if (err.code === 21608 || err.code === 21610) {
+            userMessage = 'This phone number is not verified on Twilio trial. Verify it at twilio.com/console/phone-numbers/verified.';
+            errorCode = 'UNVERIFIED_PHONE';
         } else if (err.message?.includes('not a valid phone number')) {
-            userMessage = 'Your phone number format is invalid. Please update it in your profile (e.g. +919876543210).';
+            userMessage = 'Phone number format is invalid. Use format: +919876543210';
+            errorCode = 'INVALID_PHONE';
         }
 
         res.status(500).json({
             message: userMessage,
-            twilioError: err.code || null,
+            errorCode,
             detail: err.message
         });
     }
 });
 
 // =============================================
-// POST /api/voice/call-status — Twilio callback for call status
+// POST /api/voice/exotel-incoming — INBOUND via EXOTEL
+// When someone dials the Exotel number (918047360814),
+// Exotel Passthru Applet hits this webhook.
+// We acknowledge and trigger Twilio to call them back.
+// =============================================
+router.post('/exotel-incoming', async (req, res) => {
+    const callSid = req.body.CallSid || req.body.callsid || '';
+    const callerPhone = req.body.CallFrom || req.body.From || req.body.Caller || '';
+    const exotelCallTo = req.body.CallTo || req.body.To || '';
+
+    console.log(`[Voice] ☎️ Exotel inbound call — CallSid: ${callSid}, From: ${callerPhone}, To: ${exotelCallTo}`);
+    console.log(`[Voice] Exotel full body:`, JSON.stringify(req.body, null, 2));
+
+    // Respond to Exotel immediately — tell user they'll get a callback
+    const xml = xmlResponse(`
+    <Say>Welcome to Civic Sync, Government Grievance Redressal System. You will receive a call back shortly to register your complaint. Please keep your phone ready. Thank you.</Say>
+    <Hangup/>
+    `);
+    res.type('text/xml').send(xml);
+
+    // ── Async: Bridge to Twilio ──
+    (async () => {
+        try {
+            if (!callerPhone) {
+                console.warn('[Voice] Exotel bridge: No caller phone received, skipping Twilio callback');
+                return;
+            }
+
+            const formattedPhone = normalizePhone(callerPhone);
+            console.log(`[Voice] Exotel→Twilio bridge: Normalized phone: ${formattedPhone}`);
+
+            // Look up user by phone number
+            const normalizedDigits = callerPhone.replace(/\D/g, '');
+            const phoneVariants = [
+                callerPhone,
+                `+${normalizedDigits}`,
+                `+91${normalizedDigits.slice(-10)}`,
+                normalizedDigits.slice(-10),
+            ];
+            const user = await User.findOne({ phone: { $in: phoneVariants } });
+
+            // Store mapping so complaint links to user
+            callUserMap[formattedPhone] = {
+                userId: user?._id || null,
+                userName: user?.name || 'Exotel Caller',
+                userEmail: user?.email || '',
+                userCity: user?.city || '',
+                userPhone: formattedPhone,
+                timestamp: Date.now(),
+                source: 'exotel_inbound'
+            };
+
+            if (user) {
+                console.log(`[Voice] Exotel bridge: Matched caller ${callerPhone} → ${user.email} (${user.name})`);
+            } else {
+                console.log(`[Voice] Exotel bridge: No registered user found for ${callerPhone}, will register as anonymous`);
+            }
+
+            // Wait for Exotel call to fully disconnect before Twilio calls back
+            console.log(`[Voice] Exotel→Twilio bridge: Waiting 4s for Exotel call to end...`);
+            await new Promise(resolve => setTimeout(resolve, 4000));
+
+            // Trigger Twilio outbound call with IVR
+            const twilioService = require('../services/twilio');
+            const call = await twilioService.makeCall(formattedPhone);
+
+            if (call.callSid) {
+                callUserMap[call.callSid] = callUserMap[formattedPhone];
+                console.log(`[Voice] ✅ Exotel→Twilio bridge SUCCESS: ${formattedPhone} → Twilio SID: ${call.callSid}`);
+            }
+
+        } catch (err) {
+            console.error('[Voice] ❌ Exotel→Twilio bridge FAILED:', err.message);
+            console.error('[Voice] Bridge error details:', err);
+        }
+    })();
+});
+
+// =============================================
+// POST /api/voice/incoming — DIRECT INBOUND IVR
+// Generic webhook for both Twilio and Exotel inbound calls.
+// Starts with language selection, then records complaint.
+// =============================================
+router.post('/incoming', (req, res) => {
+    const callSid = req.body.CallSid || req.body.callsid || '';
+    const callerPhone = req.body.CallFrom || req.body.From || req.body.Caller || '';
+    const isTwilio = !!req.body.AccountSid;
+
+    console.log(`[Voice] Inbound call webhook — CallSid: ${callSid}, From: ${callerPhone}, Provider: ${isTwilio ? 'twilio' : 'exotel'}`);
+
+    // Try to link to existing user by phone
+    if (callerPhone) {
+        if (callUserMap[callerPhone]) {
+            callUserMap[callSid] = callUserMap[callerPhone];
+        } else {
+            const normalizedPhone = callerPhone.replace(/\D/g, '');
+            const phoneVariants = [
+                callerPhone,
+                `+${normalizedPhone}`,
+                `+91${normalizedPhone.slice(-10)}`,
+                normalizedPhone.slice(-10),
+            ];
+
+            User.findOne({ phone: { $in: phoneVariants } })
+                .then(user => {
+                    if (user) {
+                        callUserMap[callSid] = {
+                            userId: user._id,
+                            userName: user.name,
+                            userEmail: user.email,
+                            userCity: user.city || '',
+                            timestamp: Date.now()
+                        };
+                        console.log(`[Voice] Matched inbound caller ${callerPhone} → ${user.email}`);
+                    }
+                })
+                .catch(err => console.warn('[Voice] User lookup failed:', err.message));
+        }
+    }
+
+    // IVR: Language selection → Record
+    const languageMenuUrl = `${WEBHOOK_BASE}/api/voice/language-selected`;
+
+    const xml = xmlResponse(`
+    <Say voice="Polly.Aditi">Welcome to Civic Sync, the Government Grievance Redressal System.</Say>
+    <Gather numDigits="1" action="${languageMenuUrl}" method="POST" timeout="8">
+        <Say voice="Polly.Aditi">Please select your language.</Say>
+        <Say voice="Polly.Aditi">Press 1 for Hindi.</Say>
+        <Say voice="Polly.Aditi">Press 2 for English.</Say>
+        <Say voice="Polly.Aditi">Press 3 for Marathi.</Say>
+        <Say voice="Polly.Aditi">Press 4 for Tamil.</Say>
+        <Say voice="Polly.Aditi">Press 5 for Telugu.</Say>
+        <Say voice="Polly.Aditi">Press 6 for Kannada.</Say>
+        <Say voice="Polly.Aditi">Press 7 for Bengali.</Say>
+    </Gather>
+    <Say voice="Polly.Aditi">No input received. You can speak in any Indian language after the beep. Press the hash key when you are done.</Say>
+    <Record maxLength="120" playBeep="true" action="${WEBHOOK_BASE}/api/voice/recording-complete" finishOnKey="#" trim="trim-silence" />
+    <Say voice="Polly.Aditi">We did not receive your recording. Goodbye.</Say>
+    `);
+
+    res.type('text/xml').send(xml);
+});
+
+// =============================================
+// POST /api/voice/language-selected — IVR language choice
+// After user presses a digit, play language-specific greeting and record.
+// =============================================
+router.post('/language-selected', (req, res) => {
+    const digit = req.body.Digits || '2';
+    const callSid = req.body.CallSid || req.body.callsid || '';
+
+    const lang = LANGUAGES[digit] || LANGUAGES['2'];
+
+    console.log(`[Voice] Language selected: ${lang.name} (digit: ${digit}) — CallSid: ${callSid}`);
+
+    // Store language preference in call mapping
+    if (callUserMap[callSid]) {
+        callUserMap[callSid].language = lang.code;
+        callUserMap[callSid].languageName = lang.name;
+    } else {
+        // Create mapping if doesn't exist
+        callUserMap[callSid] = {
+            language: lang.code,
+            languageName: lang.name,
+            timestamp: Date.now()
+        };
+    }
+
+    const recordingCallbackUrl = `${WEBHOOK_BASE}/api/voice/recording-complete`;
+
+    const xml = xmlResponse(`
+    <Say voice="Polly.Aditi">You selected ${lang.name}.</Say>
+    <Say voice="Polly.Aditi">${lang.greeting}</Say>
+    <Record maxLength="120" playBeep="true" action="${recordingCallbackUrl}" finishOnKey="#" trim="trim-silence" />
+    <Say voice="Polly.Aditi">We did not receive your recording. Goodbye.</Say>
+    `);
+
+    res.type('text/xml').send(xml);
+});
+
+// =============================================
+// POST /api/voice/recording-complete — Process recording
+// Called by BOTH Twilio and Exotel after recording finishes.
+// Pipeline: Sarvam STT → Groq Classification → Save to DB
+// =============================================
+router.post('/recording-complete', async (req, res) => {
+    const callSid = req.body.CallSid || req.body.callsid || '';
+    const recordingUrl = req.body.RecordingUrl || req.body.RecordUrl || '';
+    const callerPhone = req.body.CallFrom || req.body.From || req.body.Caller || '';
+    const isTwilio = !!req.body.AccountSid;
+
+    console.log(`[Voice] 🎙️ Recording complete — CallSid: ${callSid}, From: ${callerPhone}, Provider: ${isTwilio ? 'twilio' : 'exotel'}`);
+    console.log(`[Voice] Recording URL: ${recordingUrl}`);
+
+    // Respond immediately (say goodbye) so the call ends cleanly
+    const xml = xmlResponse(`
+    <Say voice="Polly.Aditi">Thank you. Your complaint has been registered successfully. You will see it on your dashboard shortly. Goodbye.</Say>
+    `);
+    res.type('text/xml').send(xml);
+
+    // ── Async processing pipeline ──
+    try {
+        // Find user from our mapping
+        let userId = null;
+        let userCity = '';
+        let selectedLanguage = 'unknown';
+        let callSource = 'voice_call';
+
+        // Try CallSid mapping first
+        if (callUserMap[callSid]) {
+            userId = callUserMap[callSid].userId;
+            userCity = callUserMap[callSid].userCity || '';
+            selectedLanguage = callUserMap[callSid].language || 'unknown';
+            callSource = callUserMap[callSid].source || 'voice_call';
+        }
+        // Try phone mapping
+        if (!userId && callerPhone) {
+            const normalizedCaller = normalizePhone(callerPhone);
+            if (callUserMap[normalizedCaller]) {
+                userId = callUserMap[normalizedCaller].userId;
+                userCity = callUserMap[normalizedCaller].userCity || '';
+                selectedLanguage = callUserMap[normalizedCaller].language || selectedLanguage;
+                callSource = callUserMap[normalizedCaller].source || callSource;
+            }
+        }
+        // Last resort: DB lookup by phone
+        if (!userId && callerPhone) {
+            const normalizedPhone = callerPhone.replace(/\D/g, '');
+            const phoneVariants = [
+                callerPhone,
+                `+${normalizedPhone}`,
+                `+91${normalizedPhone.slice(-10)}`,
+                normalizedPhone.slice(-10),
+            ];
+            const user = await User.findOne({ phone: { $in: phoneVariants } });
+            if (user) {
+                userId = user._id;
+                userCity = user.city || '';
+                console.log(`[Voice] Matched caller ${callerPhone} → user ${user.email}`);
+            }
+        }
+
+        if (!recordingUrl) {
+            console.warn('[Voice] No recording URL received, skipping processing');
+            return;
+        }
+
+        // For Twilio recordings, append .wav for proper format
+        let audioUrl = recordingUrl;
+        if (isTwilio && !recordingUrl.endsWith('.wav') && !recordingUrl.endsWith('.mp3')) {
+            audioUrl = recordingUrl + '.wav';
+        }
+
+        console.log(`[Voice] Processing audio: ${audioUrl} (language: ${selectedLanguage}, source: ${callSource})`);
+
+        // ── STEP 1: Sarvam AI — Speech to Text ──
+        let transcriptText = 'Voice complaint (transcription pending)';
+        let detectedLanguage = selectedLanguage;
+        if (aiService) {
+            try {
+                const sttResult = await aiService.speechToText(audioUrl);
+                transcriptText = sttResult.transcript || transcriptText;
+                detectedLanguage = sttResult.language || detectedLanguage;
+                console.log(`[Voice] ✅ Sarvam transcript: "${transcriptText}" (lang: ${detectedLanguage})`);
+            } catch (sttErr) {
+                console.warn('[Voice] ⚠️ Sarvam STT failed:', sttErr.message);
+            }
+        }
+
+        // ── STEP 2: Groq — Classify complaint into department + category ──
+        let classification = {
+            intentCategory: 'Other',
+            department: 'municipal',
+            landmark: '',
+            description: transcriptText,
+            severity: 'Low'
+        };
+        if (aiService && transcriptText !== 'Voice complaint (transcription pending)') {
+            try {
+                classification = await aiService.classifyComplaint(transcriptText);
+                console.log(`[Voice] ✅ Groq classification: dept=${classification.department}, cat=${classification.intentCategory}, severity=${classification.severity}`);
+            } catch (classErr) {
+                console.warn('[Voice] ⚠️ Groq classification failed:', classErr.message);
+            }
+        }
+
+        // ── STEP 3: Save to Database ──
+        const ticketNumber = 'TKT-' + Math.floor(100000 + Math.random() * 900000);
+
+        const ticket = new MasterTicket({
+            intentCategory: classification.intentCategory || 'Other',
+            description: classification.description || transcriptText,
+            severity: classification.severity || 'Low',
+            complaintCount: 1,
+            status: 'Open',
+            needsManualGeo: true,
+            landmark: classification.landmark || 'From voice call — needs review',
+            audioUrl: audioUrl,
+            department: classification.department || null,
+            city: userCity,
+            ticketNumber,
+        });
+        await ticket.save();
+
+        const callerHash = callerPhone
+            ? crypto.createHash('sha256').update(callerPhone).digest('hex')
+            : 'unknown';
+
+        const rawComplaint = new RawComplaint({
+            userId: userId || undefined,
+            callerPhone: callerHash,
+            callerPhoneRaw: callerPhone || '',
+            audioUrl: audioUrl,
+            status: 'Open',
+            source: 'voice_call',
+            transcriptOriginal: transcriptText,
+            transcriptEnglish: classification.description || transcriptText,
+            intentCategory: classification.intentCategory || 'Other',
+            extractedLandmark: classification.landmark || '',
+            department: classification.department || null,
+            masterTicketId: ticket._id
+        });
+        await rawComplaint.save();
+
+        console.log(`[Voice] ✅ Complaint saved: ${ticketNumber} | Dept: ${classification.department} | Category: ${classification.intentCategory} | Language: ${detectedLanguage} | Source: ${callSource} | User: ${userId || 'anonymous-inbound'}`);
+
+        // Cleanup session
+        delete callUserMap[callSid];
+
+    } catch (err) {
+        console.error('[Voice Pipeline Error]', err);
+    }
+});
+
+// =============================================
+// POST /api/voice/call-status — Status callback (Twilio + Exotel)
 // =============================================
 router.post('/call-status', (req, res) => {
-    console.log(`[Voice] Call ${req.body.CallSid} status: ${req.body.CallStatus} (duration: ${req.body.CallDuration}s)`);
+    const callSid = req.body.CallSid || req.body.callsid || '';
+    const status = req.body.CallStatus || req.body.Status || '';
+    const duration = req.body.CallDuration || req.body.Duration || '0';
+    console.log(`[Voice] Call ${callSid} status: ${status} (duration: ${duration}s)`);
     res.sendStatus(200);
 });
+
+// =============================================
+// GET /api/voice/status — Check service availability
+// =============================================
+router.get('/status', (req, res) => {
+    const hasSarvam = !!process.env.SARVAM_API_KEY;
+    const hasGroq = !!process.env.GROQ_API_KEY;
+    const hasExotel = !!(process.env.EXOTEL_ACCOUNT_SID && process.env.EXOTEL_API_KEY);
+
+    // Proper Twilio validation — SID must start with AC, no placeholders
+    let hasTwilio = false;
+    try {
+        const { isTwilioConfigured } = require('../services/twilio');
+        hasTwilio = isTwilioConfigured();
+    } catch (e) {
+        hasTwilio = false;
+    }
+
+    res.json({
+        available: (hasTwilio || hasExotel) && hasSarvam && hasGroq,
+        twilio: hasTwilio,
+        twilioNote: !hasTwilio ? 'Set real TWILIO_ACCOUNT_SID (starts with AC), TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER in backend/.env' : 'OK',
+        exotel: hasExotel,
+        sarvam: hasSarvam,
+        groq: hasGroq,
+        webhookBase: WEBHOOK_BASE,
+        endpoints: {
+            outbound: 'POST /api/voice/call-me (Twilio)',
+            exotelInbound: 'POST /api/voice/exotel-incoming (Exotel → Twilio bridge)',
+            directInbound: 'POST /api/voice/incoming (Twilio/Exotel IVR)',
+            languageSelect: 'POST /api/voice/language-selected',
+            recordingComplete: 'POST /api/voice/recording-complete',
+        },
+        exotelNumber: process.env.EXOTEL_PHONE_NUMBER || 'Not configured',
+        message: [
+            !hasTwilio ? 'TWILIO creds missing/invalid (outbound calls won\'t work)' : null,
+            !hasExotel ? 'EXOTEL creds missing (inbound calls)' : null,
+            !hasSarvam ? 'SARVAM_API_KEY missing' : null,
+            !hasGroq ? 'GROQ_API_KEY missing' : null,
+        ].filter(Boolean).join(', ') || 'All services ready ✅'
+    });
+});
+
+// =============================================
+// POST /api/voice/test-pipeline — Test the full pipeline manually
+// Simulates a complaint going through STT → Classification → DB
+// =============================================
+router.post('/test-pipeline', protect, async (req, res) => {
+    const { transcript, language, phone } = req.body;
+    const testTranscript = transcript || 'There is a large pothole on MG Road near City Mall, it has been there for two weeks and is causing accidents.';
+
+    console.log(`[Voice Test] Running pipeline test with transcript: "${testTranscript}"`);
+
+    try {
+        // STEP 1: Groq Classification
+        let classification = {
+            intentCategory: 'Other',
+            department: 'municipal',
+            landmark: '',
+            description: testTranscript,
+            severity: 'Low'
+        };
+
+        if (aiService) {
+            classification = await aiService.classifyComplaint(testTranscript);
+            console.log(`[Voice Test] Groq result:`, classification);
+        }
+
+        // STEP 2: Save to DB
+        const ticketNumber = 'TKT-TEST-' + Math.floor(100000 + Math.random() * 900000);
+
+        const ticket = new MasterTicket({
+            intentCategory: classification.intentCategory || 'Other',
+            description: classification.description || testTranscript,
+            severity: classification.severity || 'Low',
+            complaintCount: 1,
+            status: 'Open',
+            needsManualGeo: true,
+            landmark: classification.landmark || 'Test complaint — needs review',
+            department: classification.department || null,
+            city: req.user.city || '',
+            ticketNumber,
+        });
+        await ticket.save();
+
+        const rawComplaint = new RawComplaint({
+            userId: req.user._id,
+            status: 'Open',
+            source: 'voice_call',
+            transcriptOriginal: testTranscript,
+            transcriptEnglish: classification.description || testTranscript,
+            intentCategory: classification.intentCategory || 'Other',
+            extractedLandmark: classification.landmark || '',
+            department: classification.department || null,
+            masterTicketId: ticket._id
+        });
+        await rawComplaint.save();
+
+        console.log(`[Voice Test] ✅ Test complaint saved: ${ticketNumber}`);
+
+        res.json({
+            success: true,
+            ticketNumber,
+            classification,
+            message: `Test complaint saved! Check dashboards for ticket ${ticketNumber}.`,
+            ticket: { id: ticket._id, ...ticket.toObject() }
+        });
+    } catch (err) {
+        console.error('[Voice Test Error]', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// ── Helper: Normalize phone number to E.164 ──
+function normalizePhone(phone) {
+    let formatted = String(phone || '').trim();
+    const digitsOnly = formatted.replace(/\D/g, '');
+    // 10 digits: Indian mobile without prefix
+    if (digitsOnly.length === 10) {
+        return `+91${digitsOnly}`;
+    }
+    // 11 digits starting with 0: Indian STD format (0XXXXXXXXXX)
+    if (digitsOnly.length === 11 && digitsOnly.startsWith('0')) {
+        return `+91${digitsOnly.slice(1)}`;
+    }
+    // 12 digits starting with 91: already has country code
+    if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
+        return `+${digitsOnly}`;
+    }
+    // Already has +
+    if (formatted.startsWith('+')) {
+        return `+${formatted.slice(1).replace(/\D/g, '')}`;
+    }
+    // Fallback: prepend +91 to last 10 digits
+    if (digitsOnly.length >= 10) {
+        return `+91${digitsOnly.slice(-10)}`;
+    }
+    return `+${digitsOnly}`;
+}
+
+// Cleanup old sessions every 30 min
+setInterval(() => {
+    const now = Date.now();
+    const TTL = 30 * 60 * 1000;
+    for (const key of Object.keys(callUserMap)) {
+        if (callUserMap[key]?.timestamp && now - callUserMap[key].timestamp > TTL) {
+            delete callUserMap[key];
+        }
+    }
+}, 30 * 60 * 1000);
 
 module.exports = router;

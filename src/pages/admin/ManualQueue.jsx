@@ -20,11 +20,16 @@ export default function ManualQueue() {
         try {
             const { data } = await api.get('/tickets/master?needsManualGeo=true');
             setQueue(data);
-        } catch (err) { console.error(err); }
+        } catch (error) { console.error(error); }
         setLoading(false);
     };
 
-    useEffect(() => { fetchQueue(); }, []);
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            fetchQueue();
+        }, 0);
+        return () => clearTimeout(timer);
+    }, []);
 
     const handleMapClick = (e) => {
         if (!selectedTicket) return toast("Select a ticket from the left first!");
@@ -44,7 +49,7 @@ export default function ManualQueue() {
             setPinDrop(null);
             setSelectedTicket(null);
             fetchQueue();
-        } catch (err) {
+        } catch {
             toast.error("Failed to update coordinates");
         }
     };

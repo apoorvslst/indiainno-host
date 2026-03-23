@@ -3,10 +3,12 @@ import DashboardLayout from "../../components/DashboardLayout";
 import api from "../../utils/api";
 import Map, { Marker, Popup, NavigationControl } from "react-map-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { useAuth } from "../../contexts/AuthContext";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
 export default function MapView() {
+    const { userProfile } = useAuth();
     const [pins, setPins] = useState([]);
     const [loading, setLoading] = useState(true);
     const [popupInfo, setPopupInfo] = useState(null);
@@ -20,24 +22,31 @@ export default function MapView() {
         const fetchPins = async () => {
             try {
                 const { data } = await api.get('/tickets/master');
-                setPins(data.filter(t => t.lat && t.lng));
+                const district = userProfile?.city?.trim().toLowerCase();
+                const hasCoords = (t) => Number.isFinite(t?.lat) && Number.isFinite(t?.lng);
+                const inDistrict = (t) => !district || (t.city || '').trim().toLowerCase() === district;
+                const districtPins = data.filter(t => hasCoords(t) && inDistrict(t));
+                setPins(districtPins);
+                if (districtPins.length > 0) {
+                    setViewState((prev) => ({ ...prev, latitude: districtPins[0].lat, longitude: districtPins[0].lng }));
+                }
             } catch (err) {
                 console.error(err);
             }
             setLoading(false);
         };
         fetchPins();
-    }, []);
+    }, [userProfile?.city]);
 
     return (
-        <DashboardLayout title="Live Incident Map" subtitle="City-wide heatmap and clustering of active deduplicated tickets">
+        <DashboardLayout title="Live Incident Map" subtitle={`District incidents for ${userProfile?.city || "your assigned district"}`}>
             <div className="card p-0 h-[70vh] relative animate-fadeInUp overflow-hidden">
                 {loading && <div className="absolute inset-0 bg-[var(--color-surface)]/80 flex items-center justify-center z-10"><div className="spinner" /></div>}
 
                 <Map
                     {...viewState}
                     onMove={evt => setViewState(evt.viewState)}
-                    mapStyle="mapbox://styles/mapbox/dark-v11"
+                    mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
                     mapboxAccessToken={MAPBOX_TOKEN}
                 >
                     <NavigationControl position="top-right" />

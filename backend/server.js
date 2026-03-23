@@ -5,6 +5,15 @@ const connectDB = require('./config/db');
 
 dotenv.config();
 
+// ── Global crash protection ──
+process.on('uncaughtException', (err) => {
+    console.error('[UNCAUGHT EXCEPTION] Server will continue running:', err.message);
+    console.error(err.stack);
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('[UNHANDLED REJECTION] Server will continue running:', reason);
+});
+
 const app = express();
 
 // Middleware
@@ -39,7 +48,9 @@ app.get('/', (req, res) => {
 // Config endpoint to fetch public settings without hardcoding (like twilio number)
 app.get('/api/config', (req, res) => {
     res.json({
-        helplineNumber: process.env.TWILIO_PHONE_NUMBER || "Not Configured"
+        helplineNumber: process.env.EXOTEL_PHONE_NUMBER || process.env.TWILIO_PHONE_NUMBER || "Not Configured",
+        exotelNumber: process.env.EXOTEL_PHONE_NUMBER || "Not Configured",
+        webhookBase: process.env.WEBHOOK_BASE_URL || "http://localhost:5000"
     });
 });
 
@@ -62,7 +73,7 @@ app.use((req, res) => {
 });
 
 // Global error handler
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
     console.error('[Server Error]', err.stack);
     res.status(500).json({ message: 'Internal server error' });
 });
@@ -81,6 +92,16 @@ connectDB().then(() => {
         console.log(`   GET  /api/tickets/master`);
         console.log(`   PUT  /api/tickets/master/:id`);
         console.log(`   GET  /api/users`);
-        console.log(`   PUT  /api/users/:id\n`);
+        console.log(`   PUT  /api/users/:id`);
+        console.log(`📞 [Voice Endpoints]`);
+        console.log(`   POST /api/voice/call-me             → Outbound via Twilio`);
+        console.log(`   POST /api/voice/exotel-incoming      → Exotel inbound → Twilio bridge`);
+        console.log(`   POST /api/voice/incoming             → Direct IVR (language select + record)`);
+        console.log(`   POST /api/voice/language-selected    → Language choice handler`);
+        console.log(`   POST /api/voice/recording-complete   → STT → AI → DB pipeline`);
+        console.log(`   POST /api/voice/test-pipeline        → Test pipeline manually`);
+        console.log(`   GET  /api/voice/status               → Service health check`);
+        console.log(`🔗 [Webhook Base] ${process.env.WEBHOOK_BASE_URL || 'http://localhost:5000'}`);
+        console.log(`☎️  [Exotel Number] ${process.env.EXOTEL_PHONE_NUMBER || 'Not configured'}\n`);
     });
 });

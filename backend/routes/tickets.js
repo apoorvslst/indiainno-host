@@ -13,6 +13,10 @@ function calculateSeverity(count) {
     return "Low";
 }
 
+function hasGeoCoordinates(lat, lng) {
+    return Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+}
+
 // Helper: Format ticket for frontend
 function formatTicket(t) {
     const obj = t.toObject ? t.toObject() : t;
@@ -40,14 +44,18 @@ router.post('/complaint', protect, async (req, res) => {
         let isNew = false;
 
         // Spatial deduplication using MongoDB 2dsphere
-        if (lat && lng) {
+        const hasLocation = hasGeoCoordinates(lat, lng);
+
+        if (hasLocation) {
+            const latNum = Number(lat);
+            const lngNum = Number(lng);
             try {
                 const nearbyTickets = await MasterTicket.find({
                     intentCategory: category,
                     status: { $nin: ['Closed', 'Invalid_Spam'] },
                     location: {
                         $near: {
-                            $geometry: { type: "Point", coordinates: [lng, lat] },
+                            $geometry: { type: "Point", coordinates: [lngNum, latNum] },
                             $maxDistance: DEDUP_RADIUS_METERS
                         }
                     }
@@ -76,10 +84,11 @@ router.post('/complaint', protect, async (req, res) => {
                 complaintCount: 1,
                 status: "Open",
                 department: department || null,
-                needsManualGeo: (!lat || !lng),
+                needsManualGeo: !hasLocation,
                 landmark: landmark || "",
                 city: req.user.city || "",
-                location: (lat && lng) ? { type: "Point", coordinates: [lng, lat] } : undefined
+                location: hasLocation ? { type: "Point", coordinates: [Number(lng), Number(lat)] } : undefined,
+                ticketNumber: 'TKT-' + Math.floor(100000 + Math.random() * 900000)
             });
             await matchingTicket.save();
         }
@@ -91,7 +100,7 @@ router.post('/complaint', protect, async (req, res) => {
             transcriptEnglish: description,
             intentCategory: category,
             extractedLandmark: landmark || '',
-            location: (lat && lng) ? { type: "Point", coordinates: [lng, lat] } : undefined,
+            location: hasLocation ? { type: "Point", coordinates: [Number(lng), Number(lat)] } : undefined,
             geoAccuracy: accuracy,
             department: department,
             source: 'web_form',
@@ -132,12 +141,42 @@ router.get('/my-complaints', protect, async (req, res) => {
     }
 });
 
+// ─── GET /api/tickets/nearby ─── Nearby active tickets for citizen map
+router.get('/nearby', protect, async (req, res) => {
+    try {
+        const { lat, lng, radius } = req.query;
+        if (!hasGeoCoordinates(lat, lng)) {
+            return res.status(400).json({ message: 'lat and lng are required' });
+        }
+
+        const maxDistance = parseInt(radius, 10) || 5000; // default 5km
+
+        const tickets = await MasterTicket.find({
+            status: { $nin: ['Closed', 'Invalid_Spam'] },
+            location: {
+                $nearSphere: {
+                    $geometry: { type: "Point", coordinates: [Number(lng), Number(lat)] },
+                    $maxDistance: maxDistance
+                }
+            }
+        }).limit(100);
+
+        res.json(tickets.map(formatTicket));
+    } catch (err) {
+        console.error('[Nearby Tickets Error]', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // ─── GET /api/tickets/master ─── All master tickets (filtered by role)
 router.get('/master', protect, async (req, res) => {
     try {
         const query = {};
-        if (req.user.city) {
-            query.city = req.user.city;
+        const assignedDistrict = (req.user.city || '').trim();
+        if (assignedDistrict) {
+            query.city = assignedDistrict;
+        } else if (['admin', 'engineer'].includes(req.user.role)) {
+            return res.json([]);
         }
 
         if (req.user.role === 'engineer' && req.user.department) {
@@ -174,15 +213,33 @@ router.get('/master/:id', protect, async (req, res) => {
 });
 
 // ─── PUT /api/tickets/master/:id ─── Update ticket
-router.put('/master/:id', protect, async (req, res) => {
+router.put('/master/:id', protect, authorize('admin', 'engineer'), async (req, res) => {
     try {
         const ticket = await MasterTicket.findById(req.params.id);
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        const isAdmin = req.user.role === 'admin';
+        const isEngineer = req.user.role === 'engineer';
+        const isAssignedEngineer = ticket.assignedEngineerId && ticket.assignedEngineerId.toString() === req.user._id.toString();
+        const isEligibleUnassignedEngineer = !ticket.assignedEngineerId && req.user.department && ticket.department === req.user.department;
+
+        if (isEngineer && !isAssignedEngineer && !isEligibleUnassignedEngineer) {
+            return res.status(403).json({ message: 'Engineers can only update assigned or own-department unassigned tickets' });
+        }
+
+        if (isEngineer) {
+            const restrictedFields = ['status', 'assignedEngineerId', 'needsManualGeo', 'severity', 'complaintCount', 'department', 'city', 'lat', 'lng'];
+            const attemptedRestrictedField = restrictedFields.some((field) => req.body[field] !== undefined);
+            if (attemptedRestrictedField) {
+                return res.status(403).json({ message: 'Engineers are not allowed to modify admin-controlled fields' });
+            }
+        }
 
         // Dynamic field updates
         const allowedFields = ['status', 'assignedEngineerId', 'needsManualGeo', 'resolutionNotes', 'severity', 'complaintCount', 'department', 'landmark', 'city', 'progressPercent'];
         allowedFields.forEach(field => {
             if (req.body[field] !== undefined) {
+                if (isEngineer && !['progressPercent', 'resolutionNotes'].includes(field)) return;
                 if (field === 'assignedEngineerId' && !req.body[field]) {
                     ticket[field] = null;
                 } else {
@@ -191,14 +248,18 @@ router.put('/master/:id', protect, async (req, res) => {
             }
         });
 
+        if (isEngineer && req.body.progressPercent !== undefined && Number(req.body.progressPercent) < 100) {
+            ticket.status = 'In_Progress';
+        }
+
         // Manual coordinate fix from Admin
-        if (req.body.lat && req.body.lng) {
-            ticket.location = { type: 'Point', coordinates: [req.body.lng, req.body.lat] };
+        if (isAdmin && hasGeoCoordinates(req.body.lat, req.body.lng)) {
+            ticket.location = { type: 'Point', coordinates: [Number(req.body.lng), Number(req.body.lat)] };
         }
 
         // Engineer resolution submission
-        if (req.body.resolutionLat && req.body.resolutionLng) {
-            ticket.resolutionLocation = { type: 'Point', coordinates: [req.body.resolutionLng, req.body.resolutionLat] };
+        if (hasGeoCoordinates(req.body.resolutionLat, req.body.resolutionLng)) {
+            ticket.resolutionLocation = { type: 'Point', coordinates: [Number(req.body.resolutionLng), Number(req.body.resolutionLat)] };
             ticket.resolutionImageUrl = req.body.resolutionImageUrl;
             ticket.resolutionTimestamp = new Date();
             ticket.status = 'Pending_Verification';
@@ -213,10 +274,20 @@ router.put('/master/:id', protect, async (req, res) => {
 });
 
 // ─── PUT /api/tickets/master/:id/verify ─── Citizen verifies resolution
-router.put('/master/:id/verify', protect, async (req, res) => {
+router.put('/master/:id/verify', protect, authorize('user', 'admin'), async (req, res) => {
     try {
         const ticket = await MasterTicket.findById(req.params.id);
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        if (req.user.role !== 'admin') {
+            const hasComplaint = await RawComplaint.exists({
+                userId: req.user._id,
+                masterTicketId: ticket._id
+            });
+            if (!hasComplaint) {
+                return res.status(403).json({ message: 'You can only verify tickets linked to your complaints' });
+            }
+        }
 
         const { verified, rating, feedback } = req.body;
 
@@ -233,6 +304,44 @@ router.put('/master/:id/verify', protect, async (req, res) => {
         res.json(formatTicket(ticket));
     } catch (err) {
         console.error('[Ticket Verify Error]', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// ─── POST /api/tickets/master/:id/upvote ─── Citizen +1 upvote with proof
+router.post('/master/:id/upvote', protect, authorize('user'), async (req, res) => {
+    try {
+        const ticket = await MasterTicket.findById(req.params.id);
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        // Check if user already upvoted
+        const alreadyUpvoted = ticket.upvoters.some(
+            u => u.userId && u.userId.toString() === req.user._id.toString()
+        );
+        if (alreadyUpvoted) {
+            return res.status(400).json({ message: 'You have already upvoted this issue' });
+        }
+
+        const { proofImageUrl } = req.body;
+        if (!proofImageUrl) {
+            return res.status(400).json({ message: 'Proof image is required to upvote' });
+        }
+
+        // Add upvote
+        ticket.upvoters.push({
+            userId: req.user._id,
+            proofImageUrl: proofImageUrl
+        });
+        ticket.complaintCount += 1;
+        ticket.severity = calculateSeverity(ticket.complaintCount);
+
+        await ticket.save();
+        res.json({
+            message: 'Upvote recorded successfully!',
+            ticket: formatTicket(ticket)
+        });
+    } catch (err) {
+        console.error('[Upvote Error]', err);
         res.status(500).json({ message: err.message });
     }
 });

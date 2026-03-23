@@ -28,18 +28,16 @@ const masterTicketSchema = new mongoose.Schema({
     description: { type: String, default: '' },
     ticketNumber: { type: String, unique: true },
     progressPercent: { type: Number, default: 0, min: 0, max: 100 },
+    upvoters: [{
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        proofImageUrl: { type: String },
+        createdAt: { type: Date, default: Date.now }
+    }],
     citizenRating: { type: Number, default: null, min: 1, max: 5 },
     citizenFeedback: { type: String, default: '' }
 }, { timestamps: true });
 
-// Pre-save middleware to auto-generate ticketNumber if not exists
-masterTicketSchema.pre('save', function (next) {
-    if (!this.ticketNumber) {
-        // e.g., TKT-123456
-        this.ticketNumber = 'TKT-' + Math.floor(100000 + Math.random() * 900000);
-    }
-    next();
-});
+
 
 const rawComplaintSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
