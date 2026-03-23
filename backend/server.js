@@ -5,7 +5,9 @@ const path = require('path');
 const fs = require('fs');
 const connectDB = require('./config/db');
 
-dotenv.config();
+// Load env from root and backend so credentials work regardless of start directory.
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+dotenv.config({ path: path.resolve(__dirname, '.env'), override: true });
 
 // ── Global crash protection ──
 process.on('uncaughtException', (err) => {
