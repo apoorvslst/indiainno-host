@@ -59,6 +59,9 @@ const rawComplaintSchema = new mongoose.Schema({
     masterTicketId: { type: mongoose.Schema.Types.ObjectId, ref: 'MasterTicket' }
 }, { timestamps: true });
 
+// Speeds up dashboard and my-complaints queries by user and recency.
+rawComplaintSchema.index({ userId: 1, createdAt: -1 });
+
 const MasterTicket = mongoose.model('MasterTicket', masterTicketSchema);
 const RawComplaint = mongoose.model('RawComplaint', rawComplaintSchema);
 

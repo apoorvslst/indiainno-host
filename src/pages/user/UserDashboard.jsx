@@ -1,20 +1,31 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import DashboardLayout from "../../components/DashboardLayout";
 import api from "../../utils/api";
+import axios from "axios";
 import toast from "react-hot-toast";
 import { HiOutlinePlus, HiOutlineClipboardList, HiOutlineClock, HiOutlineCheckCircle, HiOutlinePhone } from "react-icons/hi";
+import { useAuth } from "../../contexts/AuthContext";
+
+const VOICE_BACKEND_ORIGIN =
+    import.meta.env.VITE_BACKEND_ORIGIN ||
+    "https://photomechanically-unmustered-sharyn.ngrok-free.dev";
 
 export default function UserDashboard() {
+    const { userProfile } = useAuth();
     const [stats, setStats] = useState({ total: 0, open: 0, resolved: 0, pending: 0 });
     const [recentComplaints, setRecentComplaints] = useState([]);
     const [loading, setLoading] = useState(true);
     const [calling, setCalling] = useState(false);
+    const fetchedRef = useRef(false);
 
     useEffect(() => {
+        if (fetchedRef.current) return;
+        fetchedRef.current = true;
+
         const fetchData = async () => {
             try {
-                const { data } = await api.get('/tickets/my-complaints');
+                const { data } = await api.get('/tickets/my-complaints', { timeout: 30000 });
                 const complaints = data;
                 let open = 0, resolved = 0, pending = 0;
 
@@ -29,8 +40,13 @@ export default function UserDashboard() {
                 setRecentComplaints(complaints.slice(0, 5));
             } catch (err) {
                 console.error("Error fetching user data:", err);
+                const msg = err?.code === 'ECONNABORTED'
+                    ? "Complaints are taking longer than expected. Please wait and refresh."
+                    : (err?.response?.data?.message || "Could not load complaints. Please refresh.");
+                toast.error(msg);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
         fetchData();
     }, []);
@@ -38,10 +54,24 @@ export default function UserDashboard() {
     const handleCallMe = async () => {
         setCalling(true);
         try {
-            const { data } = await api.post('/voice/call-me');
+            const userPhone = userProfile?.phone?.trim() || "";
+            if (!userPhone) {
+                toast.error("No phone number found in your profile.");
+                setCalling(false);
+                return;
+            }
+
+            const { data } = await axios.post(
+                `${VOICE_BACKEND_ORIGIN}/initiate-call`,
+                { number: userPhone },
+                { timeout: 20000 }
+            );
             toast.success(data.message || "Call initiated! Your phone will ring shortly.", { duration: 6000, icon: '📞' });
         } catch (err) {
-            const msg = err.response?.data?.message || "Failed to initiate call.";
+            const msg =
+                err.response?.data?.message ||
+                err.response?.data?.detail?.RestException?.Message ||
+                "Failed to initiate call.";
             toast.error(msg, { duration: 8000 });
         }
         setCalling(false);
