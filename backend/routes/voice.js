@@ -14,20 +14,15 @@ try {
 
 const twilioService = require('../services/twilio');
 const exotelService = require('../services/exotel');
+const telephonyAdapter = require('../services/telephonyAdapter');
 
 // ── In-memory mapping: phone/CallSid → userId (links calls to logged-in citizens) ──
 const callUserMap = {};
 
 const WEBHOOK_BASE = process.env.WEBHOOK_BASE_URL || 'http://localhost:5000';
 
-function isExotelConfigured() {
-    return !!(
-        process.env.EXOTEL_ACCOUNT_SID &&
-        process.env.EXOTEL_API_KEY &&
-        process.env.EXOTEL_API_TOKEN &&
-        process.env.EXOTEL_PHONE_NUMBER
-    );
-}
+// Use the adapter's isExotelConfigured instead of duplicating the check
+const isExotelConfigured = telephonyAdapter.isExotelConfigured;
 
 function getConfiguredProviderMode() {
     return (process.env.VOICE_OUTBOUND_PROVIDER || 'auto').toLowerCase();
@@ -149,11 +144,20 @@ router.post('/call-me', protect, async (req, res) => {
                 ? await twilioService.makeCall(formattedPhone)
                 : await exotelService.makeCall(formattedPhone);
         } catch (primaryErr) {
-            // In auto mode, if Twilio fails at runtime, fallback to Exotel if available.
-            if (outboundProviderMode === 'auto' && selectedProvider === 'twilio' && exotelConfigured) {
-                console.warn(`[Voice] Twilio outbound failed (${primaryErr.code || primaryErr.message}); retrying with Exotel`);
-                selectedProvider = 'exotel';
-                call = await exotelService.makeCall(formattedPhone);
+            // In auto mode, fall back to the other provider if available
+            if (outboundProviderMode === 'auto') {
+                const fallback = selectedProvider === 'twilio' ? 'exotel' : 'twilio';
+                const fallbackAvailable = fallback === 'exotel' ? exotelConfigured : twilioConfigured;
+
+                if (fallbackAvailable) {
+                    console.warn(`[Voice] ${selectedProvider} outbound failed (${primaryErr.code || primaryErr.message}); retrying with ${fallback}`);
+                    selectedProvider = fallback;
+                    call = fallback === 'twilio'
+                        ? await twilioService.makeCall(formattedPhone)
+                        : await exotelService.makeCall(formattedPhone);
+                } else {
+                    throw primaryErr;
+                }
             } else {
                 throw primaryErr;
             }

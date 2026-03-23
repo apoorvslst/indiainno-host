@@ -20,12 +20,21 @@ async function speechToText(audioUrl) {
         const downloadUrl = (audioUrl && !audioUrl.includes('.')) ? audioUrl + '.wav' : audioUrl;
 
         console.log(`[Sarvam] Downloading audio from: ${downloadUrl}`);
-        const response = await axios({
+
+        // Twilio recordings require Basic Auth (AccountSID:AuthToken)
+        const axiosOpts = {
             method: "get",
             url: downloadUrl,
-            responseType: "arraybuffer", // arraybuffer is more compatible with FormData + Buffer.from
+            responseType: "arraybuffer",
             timeout: 30000,
-        });
+        };
+        if (downloadUrl.includes('api.twilio.com') && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+            axiosOpts.auth = {
+                username: process.env.TWILIO_ACCOUNT_SID,
+                password: process.env.TWILIO_AUTH_TOKEN,
+            };
+        }
+        const response = await axios(axiosOpts);
 
         // 2. Upload to Sarvam
         const form = new FormData();
@@ -33,7 +42,7 @@ async function speechToText(audioUrl) {
             filename: 'recording.wav',
             contentType: 'audio/wav'
         });
-        form.append('model', 'saaras:v2');
+        form.append('model', 'saaras:v2.5');
 
         const sarvamRes = await axios.post('https://api.sarvam.ai/speech-to-text-translate', form, {
             headers: {
@@ -70,7 +79,7 @@ async function speechToTextFromBuffer(audioBuffer, mimeType = 'audio/webm') {
             filename: `recording.${ext}`,
             contentType: mimeType
         });
-        form.append('model', 'saaras:v2');
+        form.append('model', 'saaras:v2.5');
 
         const sarvamRes = await axios.post('https://api.sarvam.ai/speech-to-text-translate', form, {
             headers: {
