@@ -227,15 +227,16 @@ router.post('/call-me', protect, async (req, res) => {
 });
 
 // =============================================
-// POST /api/voice/exotel-incoming — INBOUND via EXOTEL
+// POST/GET /api/voice/exotel-incoming — INBOUND via EXOTEL
 // When someone dials the Exotel number (918047360814),
-// Exotel Passthru Applet hits this webhook.
+// Exotel Passthru Applet hits this webhook (GET with query params).
 // We acknowledge and trigger Twilio to call them back.
 // =============================================
-router.post('/exotel-incoming', async (req, res) => {
-    const callSid = req.body.CallSid || req.body.callsid || '';
-    const callerPhone = req.body.CallFrom || req.body.From || req.body.Caller || '';
-    const exotelCallTo = req.body.CallTo || req.body.To || '';
+router.all('/exotel-incoming', async (req, res) => {
+    const params = { ...req.query, ...req.body };
+    const callSid = params.CallSid || params.callsid || '';
+    const callerPhone = params.CallFrom || params.From || params.Caller || '';
+    const exotelCallTo = params.CallTo || params.To || '';
 
     console.log(`[Voice] ☎️ Exotel inbound call — CallSid: ${callSid}, From: ${callerPhone}, To: ${exotelCallTo}`);
     console.log(`[Voice] Exotel full body:`, JSON.stringify(req.body, null, 2));
@@ -260,8 +261,12 @@ router.post('/exotel-incoming', async (req, res) => {
                 return;
             }
 
-            const formattedPhone = normalizePhone(callerPhone);
-            console.log(`[Voice] Exotel→Twilio bridge: Normalized phone: ${formattedPhone}`);
+            // Use demo phone for Twilio trial (only verified numbers work)
+            const useDemoPhone = process.env.USE_DEMO_PHONE === 'true';
+            const demoPhone = process.env.DEMO_PHONE_NUMBER;
+            const callerNormalized = normalizePhone(callerPhone);
+            const formattedPhone = (useDemoPhone && demoPhone) ? normalizePhone(demoPhone) : callerNormalized;
+            console.log(`[Voice] Exotel→Twilio bridge: Caller: ${callerNormalized}, Calling: ${formattedPhone}${useDemoPhone ? ' (demo override)' : ''}`);
 
             // Look up user by phone number
             const normalizedDigits = callerPhone.replace(/\D/g, '');
