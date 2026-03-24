@@ -101,25 +101,27 @@ async function speechToTextFromBuffer(audioBuffer, mimeType = 'audio/webm') {
 }
 
 /**
- * 2. Groq LLM - Full complaint classification
- * Takes an English transcript, returns intentCategory, department, landmark, severity, description.
+ * 2. Groq LLM - Full MCD complaint classification
+ * Takes an English transcript, returns all structured fields needed for a complaint form.
+ * This IS the auto-form-fill: Groq extracts everything a citizen would type manually.
  */
 async function classifyComplaint(englishTranscript) {
     const prompt = `
-You are an AI classifier for CivicSync, a civic grievance system in India.
-Analyze this citizen complaint and extract structured data.
+You are an AI classifier for CivicSync, an MCD (Municipal Corporation of Delhi) grievance system.
+Analyze this citizen complaint and extract ALL structured data as if filling a complaint registration form.
 
 RULES (STRICTLY FOLLOW):
-- EVERY field MUST have a non-empty value. NEVER return an empty string for department or intentCategory.
+- EVERY field MUST have a non-empty value. NEVER return an empty string for department or primaryCategory.
 - If the complaint does not clearly fit a category, use "Other".
 - If the department is unclear, pick the closest match. Default to "municipal" if truly ambiguous.
-- For scams/fraud/cybercrime → department: "police", intentCategory: "Safety_Concern"
+- For scams/fraud/cybercrime → department: "police", primaryCategory: "Safety_Concern"
 - For medical issues → department: "health"
+- Extract location info (zone, ward, locality, pincode) if mentioned.
 
 "department" MUST be exactly ONE of:
 pwd, water_supply, municipal, electricity, transport, health, police, fire, environment, education, revenue, social_welfare, food_civil, urban_dev, telecom, forest
 
-"intentCategory" MUST be exactly ONE of:
+"primaryCategory" MUST be exactly ONE of:
 Pothole, Road_Damage, Bridge_Issue, Building_Maintenance,
 Water_Leak, No_Water, Sewage_Overflow, Drainage_Block,
 Garbage, Park_Maintenance, Encroachment, Illegal_Construction,
@@ -140,12 +142,17 @@ Other
 
 Transcript: "${englishTranscript}"
 
-Respond with ONLY valid JSON (no empty values):
+Respond with ONLY valid JSON (no empty values for required fields):
 {
-  "intentCategory": "one from the list above (NEVER empty)",
+  "primaryCategory": "one from the list above (NEVER empty)",
+  "subCategory": "more specific sub-issue in 2-4 words",
   "department": "one from the list above (NEVER empty)",
-  "landmark": "location mentioned, or empty string if none",
-  "description": "1-2 sentence English summary",
+  "landmark": "location/address mentioned, or empty string if none",
+  "zone": "Delhi zone if mentioned (e.g. South Zone, Rohini Zone), or empty string",
+  "wardNumber": "ward number if mentioned, or empty string",
+  "locality": "locality/area name if mentioned, or empty string",
+  "pincode": "pincode if mentioned, or empty string",
+  "description": "1-2 sentence English summary of the complaint",
   "severity": "Low or Medium or High or Critical"
 }
 `;
@@ -160,13 +167,21 @@ Respond with ONLY valid JSON (no empty values):
 
         const jsonRes = JSON.parse(chatCompletion.choices[0].message.content);
         console.log("[Groq] Classification:", jsonRes);
+        // Backward compat: also set intentCategory = primaryCategory
+        jsonRes.intentCategory = jsonRes.primaryCategory;
         return jsonRes;
     } catch (err) {
         console.error("[Groq Error]", err.message);
         return {
+            primaryCategory: "Other",
             intentCategory: "Other",
+            subCategory: "",
             department: "municipal",
             landmark: "",
+            zone: "",
+            wardNumber: "",
+            locality: "",
+            pincode: "",
             description: englishTranscript,
             severity: "Low"
         };

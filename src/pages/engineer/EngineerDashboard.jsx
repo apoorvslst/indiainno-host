@@ -83,26 +83,31 @@ export default function EngineerDashboard() {
                 </div>
             ) : (
                 <div className="grid gap-4 stagger">
-                    {tickets.map(t => (
+                    {tickets.map(t => {
+                        const category = t.primaryCategory || t.intentCategory;
+                        return (
                         <div key={t.id} className="card animate-fadeInUp hover:bg-[var(--color-card-hover)] flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div className="flex items-start gap-4">
                                 <div className="w-12 h-12 rounded-xl bg-[var(--color-surface)] flex items-center justify-center text-2xl flex-shrink-0 border border-[var(--color-border)]">
-                                    {t.intentCategory === "Pothole" ? "🕳️" :
-                                        t.intentCategory === "Streetlight" ? "💡" :
-                                            t.intentCategory === "Water_Leak" ? "💧" :
-                                                t.intentCategory === "Garbage" ? "🗑️" : "📋"}
+                                    {category === "Pothole" ? "🕳️" :
+                                        category === "Streetlight" ? "💡" :
+                                            category === "Water_Leak" ? "💧" :
+                                                category === "Garbage" ? "🗑️" : "📋"}
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                                        <h3 className="font-semibold text-lg">{t.intentCategory?.replace(/_/g, " ")}</h3>
+                                        {t.ticketNumber && <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded-sm">{t.ticketNumber}</span>}
+                                        <h3 className="font-semibold text-lg">{category?.replace(/_/g, " ")}</h3>
                                         <span className={`badge severity-${(t.severity || "low").toLowerCase()}`}>{t.severity || "Low"} Priority</span>
                                         <span className={`badge status-${(t.status || "open").toLowerCase()}`}>{t.status || "Open"}</span>
+                                        {t.source === 'voice_call' && <span className="badge bg-purple-100 text-purple-700">📞 Voice</span>}
                                     </div>
                                     <div className="flex items-center gap-4 text-sm text-[var(--color-text-muted)] mb-2 group">
                                         <span className="flex items-center gap-1">
                                             <HiOutlineLocationMarker className="text-[var(--color-primary)]" />
-                                            {t.landmark || "Coordinates Only"}
+                                            {t.landmark || t.locality || "Coordinates Only"}
                                         </span>
+                                        {t.wardNumber && <span>🏛️ Ward {t.wardNumber}</span>}
                                         {t.lat && t.lng && (
                                             <a
                                                 href={`https://www.google.com/maps/dir/?api=1&destination=${t.lat},${t.lng}`}
@@ -116,6 +121,7 @@ export default function EngineerDashboard() {
                                     </div>
                                     <p className="text-xs text-[var(--color-text-muted)]">
                                         Reported {new Date(t.createdAt).toLocaleString()} • {t.complaintCount || 1} citizens affected
+                                        {t.actionHistory?.length > 0 && ` • ${t.actionHistory.length} updates`}
                                     </p>
                                 </div>
                             </div>
@@ -123,6 +129,18 @@ export default function EngineerDashboard() {
                             <div className="md:text-right flex-shrink-0">
                                 {t.status === "Pending_Verification" ? (
                                     <button className="btn-secondary" disabled>Awaiting Citizen Check</button>
+                                ) : (t.status === "Disputed" || t.status === "Reopened") ? (
+                                    <div className="space-y-2">
+                                        {(t.reComplaintRemark || t.citizenFeedbackText) && (
+                                            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-left">
+                                                <p className="text-xs font-semibold text-red-600 mb-1">🔄 Citizen Re-complaint</p>
+                                                <p className="text-sm text-red-800">{t.reComplaintRemark || t.citizenFeedbackText}</p>
+                                            </div>
+                                        )}
+                                        <Link to={`/engineer/resolve/${t.id}`} className="btn-primary w-full md:w-auto bg-red-600 hover:bg-red-700">
+                                            Resolve Again
+                                        </Link>
+                                    </div>
                                 ) : (
                                     <Link to={`/engineer/resolve/${t.id}`} className="btn-primary w-full md:w-auto">
                                         Resolve Issue
@@ -130,7 +148,8 @@ export default function EngineerDashboard() {
                                 )}
                             </div>
                         </div>
-                    ))}
+                    );
+                    })}
                 </div>
             )}
         </DashboardLayout>

@@ -5,7 +5,7 @@ import api from "../../utils/api";
 import { getCurrentLocation } from "../../utils/geolocation";
 import DEPARTMENTS, { getCategoryDepartment } from "../../data/departments";
 import toast from "react-hot-toast";
-import { HiOutlineLocationMarker } from "react-icons/hi";
+import { HiOutlineLocationMarker, HiOutlinePhotograph } from "react-icons/hi";
 import Map, { Marker, NavigationControl } from "react-map-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 
@@ -30,7 +30,13 @@ export default function SubmitComplaint() {
         lng: null,
         accuracy: null,
         department: "",
+        zone: "",
+        wardNumber: "",
+        locality: "",
+        pincode: "",
     });
+
+    const [imagePreviews, setImagePreviews] = useState([]);
 
     useEffect(() => {
         if (!navigator.geolocation) {
@@ -78,6 +84,23 @@ export default function SubmitComplaint() {
         }
     };
 
+    const handleImageChange = (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length + imagePreviews.length > 5) {
+            return toast.error("Maximum 5 images allowed");
+        }
+        files.forEach((file) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImagePreviews((prev) => [...prev, reader.result]);
+            };
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const removeImage = (index) => {
+        setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+    };
 
     const captureLocation = async () => {
         setGeoLoading(true);
@@ -99,13 +122,18 @@ export default function SubmitComplaint() {
 
         try {
             const { data } = await api.post('/tickets/complaint', {
-                category: form.category,
+                primaryCategory: form.category,
                 description: form.description,
                 landmark: form.landmark,
                 lat: form.lat,
                 lng: form.lng,
                 accuracy: form.accuracy,
                 department: form.department,
+                zone: form.zone,
+                wardNumber: form.wardNumber,
+                locality: form.locality,
+                pincode: form.pincode,
+                citizenImages: imagePreviews,
             });
 
             if (data.isNew) {
@@ -169,9 +197,40 @@ export default function SubmitComplaint() {
                         </div>
                     </div>
 
+                    {/* Evidence: Photo Upload */}
                     <div className="card">
                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <span className="w-7 h-7 rounded-lg bg-[var(--color-accent)]/20 flex items-center justify-center text-sm font-bold text-[var(--color-accent-light)]">2</span>
+                            <span className="w-7 h-7 rounded-lg bg-[#f59e0b]/20 flex items-center justify-center text-sm font-bold text-[#f59e0b]">2</span>
+                            Upload Evidence Photos
+                        </h3>
+                        <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors border-[var(--color-border)] hover:border-[var(--color-primary)]">
+                            <div className="w-12 h-12 rounded-full bg-[var(--color-card)] flex items-center justify-center mb-3 shadow-lg">
+                                <HiOutlinePhotograph className="text-2xl text-[var(--color-primary)]" />
+                            </div>
+                            <p className="text-sm font-medium">Tap to Upload Photos (max 5)</p>
+                            <p className="text-xs text-[var(--color-text-muted)] mt-1">JPG, PNG — helps verify the complaint</p>
+                            <input type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" />
+                        </label>
+                        {imagePreviews.length > 0 && (
+                            <div className="flex flex-wrap gap-3 mt-4">
+                                {imagePreviews.map((src, i) => (
+                                    <div key={i} className="relative group">
+                                        <img src={src} alt={`Evidence ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border border-[var(--color-border)]" />
+                                        <button
+                                            type="button"
+                                            onClick={() => removeImage(i)}
+                                            className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                        >×</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Location */}
+                    <div className="card">
+                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <span className="w-7 h-7 rounded-lg bg-[var(--color-accent)]/20 flex items-center justify-center text-sm font-bold text-[var(--color-accent-light)]">3</span>
                             Where is it?
                         </h3>
                         <div className="space-y-4">
@@ -183,8 +242,30 @@ export default function SubmitComplaint() {
                                     value={form.landmark}
                                     onChange={handleChange}
                                     className="input-field"
-                                    placeholder="E.g., Near Shiv Mandir, Sector 14, Gurugram"
+                                    placeholder="E.g., Near Mother Dairy Booth, Sector 14"
                                 />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium mb-2 text-[var(--color-text-muted)]">Zone</label>
+                                    <input name="zone" type="text" value={form.zone} onChange={handleChange} className="input-field" placeholder="E.g., South Zone" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-2 text-[var(--color-text-muted)]">Ward Number</label>
+                                    <input name="wardNumber" type="text" value={form.wardNumber} onChange={handleChange} className="input-field" placeholder="E.g., Ward 54" />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium mb-2 text-[var(--color-text-muted)]">Locality</label>
+                                    <input name="locality" type="text" value={form.locality} onChange={handleChange} className="input-field" placeholder="E.g., Lajpat Nagar" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-2 text-[var(--color-text-muted)]">Pincode</label>
+                                    <input name="pincode" type="text" value={form.pincode} onChange={handleChange} className="input-field" placeholder="E.g., 110024" maxLength={6} />
+                                </div>
                             </div>
 
                             <div>

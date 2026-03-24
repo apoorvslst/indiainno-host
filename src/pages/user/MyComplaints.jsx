@@ -8,7 +8,11 @@ export default function MyComplaints() {
     const [complaints, setComplaints] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("all");
+    const [expandedTimeline, setExpandedTimeline] = useState(null);
     const fetchedRef = useRef(false);
+
+    const [reComplainId, setReComplainId] = useState(null);
+    const [reComplainRemark, setReComplainRemark] = useState("");
 
     useEffect(() => {
         if (fetchedRef.current) return;
@@ -31,30 +35,32 @@ export default function MyComplaints() {
         fetchComplaints();
     }, []);
 
-    const handleVerify = async (ticketId, verified, rating = null) => {
+    const handleVerify = async (ticketId, verified, rating = null, remark = "") => {
         try {
-            await api.put(`/tickets/master/${ticketId}/verify`, { verified, rating });
+            await api.put(`/tickets/master/${ticketId}/verify`, { verified, rating, feedback: remark });
             setComplaints(complaints.map(c => {
                 if (c.ticket?.id === ticketId || c.masterTicketId?._id === ticketId) {
                     return {
                         ...c,
-                        ticket: c.ticket ? { ...c.ticket, status: verified ? 'Closed' : 'Disputed', citizenRating: rating } : undefined,
-                        status: verified ? 'Closed' : 'Disputed'
+                        ticket: c.ticket ? { ...c.ticket, status: verified ? 'Closed' : 'Reopened', citizenRating: rating } : undefined,
+                        status: verified ? 'Closed' : 'Reopened'
                     };
                 }
                 return c;
             }));
-            if (verified) alert('Thank you for verifying! Issue closed.');
-            else alert('Dispute has been logged.');
+            setReComplainId(null);
+            setReComplainRemark("");
+            if (verified) toast.success('Thank you! Issue marked as resolved.');
+            else toast.success('Re-complaint submitted. The engineer will be notified.');
         } catch (error) {
             console.error(error);
-            alert('Failed to submit verification');
+            toast.error('Failed to submit verification');
         }
     };
 
     const filteredComplaints = filter === "all"
         ? complaints
-        : complaints.filter((c) => (c.ticket?.status || c.status || "Open") === filter);
+        : complaints.filter((c) => (c.ticket?.status || c.status || "Registered") === filter);
 
     const getCategoryIcon = (cat) => {
         const iconMap = {
@@ -76,7 +82,7 @@ export default function MyComplaints() {
                 >
                     All ({complaints.length})
                 </button>
-                {TICKET_STATUSES.slice(0, 6).map((s) => {
+                {TICKET_STATUSES.slice(0, 8).map((s) => {
                     const count = complaints.filter((c) => (c.ticket?.status || c.status) === s.value).length;
                     return (
                         <button
@@ -100,24 +106,28 @@ export default function MyComplaints() {
             ) : (
                 <div className="space-y-4 stagger">
                     {filteredComplaints.map((c) => {
-                        const status = c.ticket?.status || c.status || "Open";
+                        const status = c.ticket?.status || c.status || "Registered";
                         const severity = c.ticket?.severity || "Low";
+                        const category = c.ticket?.primaryCategory || c.intentCategory;
                         return (
                             <div key={c.id} className="card animate-fadeInUp hover:bg-[var(--color-card-hover)]">
                                 <div className="flex items-start gap-4">
                                     <div className="w-12 h-12 rounded-xl bg-[var(--color-primary)]/10 flex items-center justify-center text-2xl flex-shrink-0">
-                                        {getCategoryIcon(c.intentCategory)}
+                                        {getCategoryIcon(category)}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap mb-1">
                                             {c.ticket?.ticketNumber && <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded-sm">{c.ticket.ticketNumber}</span>}
-                                            <h3 className="font-semibold">{c.intentCategory?.replace(/_/g, " ")}</h3>
+                                            <h3 className="font-semibold">{category?.replace(/_/g, " ")}</h3>
                                             <span className={`badge status-${status.toLowerCase()}`}>{status.replace(/_/g, " ")}</span>
                                             <span className={`badge severity-${severity.toLowerCase()}`}>{severity}</span>
+                                            {c.ticket?.source === 'voice_call' && <span className="badge bg-purple-100 text-purple-700">📞 Voice</span>}
                                         </div>
                                         <p className="text-sm text-[var(--color-text-muted)] mb-2 line-clamp-2">{c.transcriptOriginal}</p>
                                         <div className="flex items-center gap-4 text-xs text-[var(--color-text-muted)]">
                                             {c.extractedLandmark && <span>📍 {c.extractedLandmark}</span>}
+                                            {c.ticket?.locality && <span>🏘️ {c.ticket.locality}</span>}
+                                            {c.ticket?.wardNumber && <span>🏛️ Ward {c.ticket.wardNumber}</span>}
                                             <span>🕐 {new Date(c.createdAt).toLocaleDateString()}</span>
                                             {c.ticket?.complaintCount > 1 && (
                                                 <span className="text-[var(--color-warning)]">👥 {c.ticket.complaintCount} reports</span>
@@ -126,27 +136,109 @@ export default function MyComplaints() {
                                     </div>
                                 </div>
 
+                                {/* Citizen Images */}
+                                {c.ticket?.citizenImages?.length > 0 && (
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {c.ticket.citizenImages.slice(0, 4).map((img, i) => (
+                                            <img key={i} src={img} alt={`Evidence ${i + 1}`} className="w-16 h-16 object-cover rounded-lg border border-[var(--color-border)]" />
+                                        ))}
+                                        {c.ticket.citizenImages.length > 4 && (
+                                            <div className="w-16 h-16 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] flex items-center justify-center text-xs font-bold text-[var(--color-text-muted)]">+{c.ticket.citizenImages.length - 4}</div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Action History Timeline */}
+                                {c.ticket?.actionHistory?.length > 0 && (
+                                    <div className="mt-3">
+                                        <button
+                                            onClick={() => setExpandedTimeline(expandedTimeline === c.id ? null : c.id)}
+                                            className="text-xs font-semibold text-[var(--color-primary-light)] hover:underline"
+                                        >
+                                            {expandedTimeline === c.id ? '▼' : '▶'} Timeline ({c.ticket.actionHistory.length} updates)
+                                        </button>
+                                        {expandedTimeline === c.id && (
+                                            <div className="mt-2 space-y-2 border-l-2 border-[var(--color-border)] pl-4">
+                                                {c.ticket.actionHistory.map((entry, i) => (
+                                                    <div key={i} className="relative">
+                                                        <div className="absolute -left-[21px] w-2.5 h-2.5 rounded-full bg-[var(--color-primary)] border-2 border-white" />
+                                                        <div className="text-xs">
+                                                            <span className="font-semibold">{entry.newStatus?.replace(/_/g, " ")}</span>
+                                                            {entry.progressPercentage !== undefined && <span className="ml-2 text-[var(--color-text-muted)]">({entry.progressPercentage}%)</span>}
+                                                            <p className="text-[var(--color-text-muted)]">{entry.remarks}</p>
+                                                            {entry.images?.length > 0 && (
+                                                                <div className="flex gap-1 mt-1">
+                                                                    {entry.images.map((img, j) => (
+                                                                        <img key={j} src={img} alt="Phase" className="w-12 h-12 object-cover rounded border" />
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            <span className="text-[var(--color-text-muted)]">{new Date(entry.actionDate).toLocaleString()}</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Verification: Satisfied / Re-complain */}
                                 {c.ticket?.status === "Pending_Verification" && (
                                     <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
                                         <h4 className="font-semibold text-sm mb-2 text-[var(--color-warning)]">Review Resolution</h4>
                                         <p className="text-sm text-[var(--color-text)] mb-3 bg-[var(--color-surface)] p-3 rounded-md">
-                                            {c.ticket?.resolutionNotes || "Fix implemented."}
+                                            {c.ticket?.resolutionRemarks || "Fix implemented."}
                                         </p>
-                                        {c.ticket?.resolutionImageUrl && (
-                                            <img src={c.ticket.resolutionImageUrl} alt="Resolution" className="w-full h-48 object-cover rounded-md mb-3" />
+                                        {c.ticket?.resolutionImages?.length > 0 && (
+                                            <div className="flex flex-wrap gap-2 mb-3">
+                                                {c.ticket.resolutionImages.map((img, i) => (
+                                                    <img key={i} src={img} alt={`Resolution ${i + 1}`} className="w-24 h-24 object-cover rounded-md border" />
+                                                ))}
+                                            </div>
                                         )}
-                                        <div className="flex items-center gap-3 mt-3">
-                                            <button
-                                                onClick={() => handleVerify(c.ticket.id, true, prompt("Rate out of 5 stars (1-5):") || 5)}
-                                                className="btn-primary text-sm py-2">
-                                                ✅ Mark as Resolved
-                                            </button>
-                                            <button
-                                                onClick={() => handleVerify(c.ticket.id, false)}
-                                                className="btn-secondary text-sm py-2 bg-red-50 text-red-600 hover:bg-red-100 border-red-200">
-                                                ❌ Reject / Disputed
-                                            </button>
-                                        </div>
+
+                                        {reComplainId === c.ticket.id ? (
+                                            <div className="space-y-3 mt-3">
+                                                <textarea
+                                                    value={reComplainRemark}
+                                                    onChange={(e) => setReComplainRemark(e.target.value)}
+                                                    placeholder="Describe why you are not satisfied..."
+                                                    className="input-field min-h-[80px]"
+                                                />
+                                                <div className="flex items-center gap-3">
+                                                    <button
+                                                        onClick={() => {
+                                                            if (!reComplainRemark.trim()) return toast.error("Please provide a remark.");
+                                                            handleVerify(c.ticket.id, false, null, reComplainRemark);
+                                                        }}
+                                                        className="btn-primary text-sm py-2 bg-red-600 hover:bg-red-700"
+                                                    >
+                                                        🔄 Submit Re-complaint
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { setReComplainId(null); setReComplainRemark(""); }}
+                                                        className="btn-secondary text-sm py-2"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-3 mt-3">
+                                                <button
+                                                    onClick={() => handleVerify(c.ticket.id, true, 5)}
+                                                    className="btn-primary text-sm py-2"
+                                                >
+                                                    ✅ Satisfied
+                                                </button>
+                                                <button
+                                                    onClick={() => setReComplainId(c.ticket.id)}
+                                                    className="btn-secondary text-sm py-2 bg-red-50 text-red-600 hover:bg-red-100 border-red-200"
+                                                >
+                                                    🔄 Re-complain
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 

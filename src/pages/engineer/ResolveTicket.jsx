@@ -106,7 +106,7 @@ export default function ResolveTicket() {
             await api.put(`/tickets/master/${ticketId}`, {
                 resolutionLat: form.lat,
                 resolutionLng: form.lng,
-                resolutionNotes: form.notes,
+                resolutionRemarks: form.notes,
                 resolutionImageUrl: form.imagePreview,
                 progressPercent: 100
             });
@@ -124,14 +124,14 @@ export default function ResolveTicket() {
     if (!ticket) return null;
 
     return (
-        <DashboardLayout title="Resolve Issue" subtitle={`Ticket ID: ${ticket.id.slice(0, 8)}`}>
+        <DashboardLayout title="Resolve Issue" subtitle={`${ticket.ticketNumber || ticket.id.slice(0, 8)}`}>
             <div className="grid md:grid-cols-2 gap-8">
                 <div className="space-y-6 animate-fadeInUp">
                     <div className="card">
                         <div className="flex justify-between items-start mb-4">
                             <div>
-                                <h2 className="text-xl font-bold">{ticket.intentCategory?.replace(/_/g, " ")}</h2>
-                                <p className="text-[var(--color-text-muted)]">{ticket.landmark || "Geo-coordinate report"}</p>
+                                <h2 className="text-xl font-bold">{(ticket.primaryCategory || ticket.intentCategory)?.replace(/_/g, " ")}</h2>
+                                <p className="text-[var(--color-text-muted)]">{ticket.landmark || ticket.locality || "Geo-coordinate report"}</p>
                             </div>
                             <span className={`badge severity-${(ticket.severity || "low").toLowerCase()}`}>{ticket.severity}</span>
                         </div>
@@ -148,6 +148,32 @@ export default function ResolveTicket() {
                                 <p className="text-[#f87171]">You must be physically within exactly 50 meters of the target coordinates to submit this resolution. Submissions outside this radius are cryptographically rejected.</p>
                             </div>
                         </div>
+
+                                {(ticket.status === "Disputed" || ticket.status === "Reopened") && (ticket.reComplaintRemark || ticket.citizenFeedbackText) && (
+                                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3 text-sm mt-4">
+                                        <span className="text-2xl shrink-0">🔄</span>
+                                        <div>
+                                            <strong className="block text-red-600 mb-1">Citizen Re-complaint</strong>
+                                            <p className="text-red-800">{ticket.reComplaintRemark || ticket.citizenFeedbackText}</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {ticket.actionHistory?.length > 0 && (
+                                    <div className="mt-4">
+                                        <h4 className="text-sm font-semibold mb-2">Timeline ({ticket.actionHistory.length} updates)</h4>
+                                        <div className="space-y-2 border-l-2 border-[var(--color-border)] pl-4 max-h-48 overflow-y-auto">
+                                            {ticket.actionHistory.map((entry, i) => (
+                                                <div key={i} className="relative text-xs">
+                                                    <div className="absolute -left-[21px] w-2.5 h-2.5 rounded-full bg-[var(--color-primary)] border-2 border-white" />
+                                                    <span className="font-semibold">{entry.newStatus?.replace(/_/g, ' ')}</span>
+                                                    {entry.progressPercentage !== undefined && <span className="ml-1 text-[var(--color-text-muted)]">{entry.progressPercentage}%</span>}
+                                                    <p className="text-[var(--color-text-muted)]">{entry.remarks}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                     </div>
                 </div>
 

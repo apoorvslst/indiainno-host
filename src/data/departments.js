@@ -134,12 +134,16 @@ export const SEVERITY_LEVELS = [
 ];
 
 export const TICKET_STATUSES = [
+    { value: "Registered", label: "Registered", color: "#6366f1" },
     { value: "Open", label: "Open", color: "#3b82f6" },
     { value: "Assigned", label: "Assigned", color: "#8b5cf6" },
     { value: "In_Progress", label: "In Progress", color: "#f59e0b" },
     { value: "Pending_Verification", label: "Pending Verification", color: "#f97316" },
+    { value: "Resolved", label: "Resolved", color: "#10b981" },
     { value: "Closed", label: "Closed", color: "#22c55e" },
+    { value: "Reopened", label: "Reopened", color: "#ef4444" },
     { value: "Disputed", label: "Disputed", color: "#ef4444" },
+    { value: "Rejected", label: "Rejected", color: "#9ca3af" },
     { value: "Invalid_Spam", label: "Invalid/Spam", color: "#9ca3af" },
 ];
 

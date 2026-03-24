@@ -423,6 +423,9 @@ router.post('/recording-complete', async (req, res) => {
         // Find user from our mapping
         let userId = null;
         let userCity = '';
+        let userName = '';
+        let userEmail = '';
+        let userPhone = '';
         let selectedLanguage = 'unknown';
         let callSource = 'voice_call';
 
@@ -430,6 +433,9 @@ router.post('/recording-complete', async (req, res) => {
         if (callUserMap[callSid]) {
             userId = callUserMap[callSid].userId;
             userCity = callUserMap[callSid].userCity || '';
+            userName = callUserMap[callSid].userName || '';
+            userEmail = callUserMap[callSid].userEmail || '';
+            userPhone = callUserMap[callSid].userPhone || '';
             selectedLanguage = callUserMap[callSid].language || 'unknown';
             callSource = callUserMap[callSid].source || 'voice_call';
         }
@@ -439,6 +445,8 @@ router.post('/recording-complete', async (req, res) => {
             if (callUserMap[normalizedCaller]) {
                 userId = callUserMap[normalizedCaller].userId;
                 userCity = callUserMap[normalizedCaller].userCity || '';
+                userName = callUserMap[normalizedCaller].userName || '';
+                userEmail = callUserMap[normalizedCaller].userEmail || '';
                 selectedLanguage = callUserMap[normalizedCaller].language || selectedLanguage;
                 callSource = callUserMap[normalizedCaller].source || callSource;
             }
@@ -456,6 +464,8 @@ router.post('/recording-complete', async (req, res) => {
             if (user) {
                 userId = user._id;
                 userCity = user.city || '';
+                userName = user.name || '';
+                userEmail = user.email || '';
                 console.log(`[Voice] Matched caller ${callerPhone} → user ${user.email}`);
             }
         }
@@ -465,7 +475,7 @@ router.post('/recording-complete', async (req, res) => {
             return;
         }
 
-        // For Twilio recordings, append .wav for proper format
+        // For Twilio recordings, append .wav
         let audioUrl = recordingUrl;
         if (isTwilio && !recordingUrl.endsWith('.wav') && !recordingUrl.endsWith('.mp3')) {
             audioUrl = recordingUrl + '.wav';
@@ -487,62 +497,58 @@ router.post('/recording-complete', async (req, res) => {
             }
         }
 
-        // ── STEP 2: Groq — Classify complaint into department + category ──
+        // ── STEP 2: Groq — Auto-fill ALL form fields from voice transcript ──
         let classification = {
+            primaryCategory: 'Other',
             intentCategory: 'Other',
+            subCategory: '',
             department: 'municipal',
             landmark: '',
+            zone: '',
+            wardNumber: '',
+            locality: '',
+            pincode: '',
             description: transcriptText,
             severity: 'Low'
         };
         if (aiService && transcriptText !== 'Voice complaint (transcription pending)') {
             try {
                 classification = await aiService.classifyComplaint(transcriptText);
-                console.log(`[Voice] ✅ Groq classification: dept=${classification.department}, cat=${classification.intentCategory}, severity=${classification.severity}`);
+                console.log(`[Voice] ✅ Groq auto-form-fill: dept=${classification.department}, cat=${classification.primaryCategory}, severity=${classification.severity}, zone=${classification.zone}, ward=${classification.wardNumber}`);
             } catch (classErr) {
                 console.warn('[Voice] ⚠️ Groq classification failed:', classErr.message);
             }
         }
 
-        // ── STEP 3: Save to Database ──
-        const ticketNumber = 'TKT-' + Math.floor(100000 + Math.random() * 900000);
+        // ── STEP 3: Use SHARED createComplaintFromData (same as web form!) ──
+        // This is the auto-form-fill: Groq output → same function as manual submission
+        const ticketsRouter = require('./tickets');
+        const fakeUser = userId ? { _id: userId, name: userName, email: userEmail, phone: userPhone || callerPhone, city: userCity } : null;
 
-        const ticket = new MasterTicket({
-            intentCategory: classification.intentCategory || 'Other',
+        const result = await ticketsRouter.createComplaintFromData({
+            primaryCategory: classification.primaryCategory || classification.intentCategory || 'Other',
+            subCategory: classification.subCategory || '',
             description: classification.description || transcriptText,
+            landmark: classification.landmark || '',
+            zone: classification.zone || '',
+            wardNumber: classification.wardNumber || '',
+            locality: classification.locality || '',
+            pincode: classification.pincode || '',
+            department: classification.department || 'municipal',
             severity: classification.severity || 'Low',
-            complaintCount: 1,
-            status: 'Open',
-            needsManualGeo: true,
-            landmark: classification.landmark || 'From voice call — needs review',
-            audioUrl: audioUrl,
-            department: classification.department || null,
-            city: userCity,
-            ticketNumber,
-        });
-        await ticket.save();
-
-        const callerHash = callerPhone
-            ? crypto.createHash('sha256').update(callerPhone).digest('hex')
-            : 'unknown';
-
-        const rawComplaint = new RawComplaint({
-            userId: userId || undefined,
-            callerPhone: callerHash,
-            callerPhoneRaw: callerPhone || '',
-            audioUrl: audioUrl,
-            status: 'Open',
             source: 'voice_call',
+            audioUrl: audioUrl,
+            callerPhone: callerPhone ? crypto.createHash('sha256').update(callerPhone).digest('hex') : '',
+            callerPhoneRaw: callerPhone || '',
             transcriptOriginal: transcriptText,
             transcriptEnglish: classification.description || transcriptText,
-            intentCategory: classification.intentCategory || 'Other',
-            extractedLandmark: classification.landmark || '',
-            department: classification.department || null,
-            masterTicketId: ticket._id
-        });
-        await rawComplaint.save();
+            complainantName: userName || 'Voice Caller',
+            complainantPhone: callerPhone || '',
+            complainantEmail: userEmail || '',
+            city: userCity
+        }, fakeUser);
 
-        console.log(`[Voice] ✅ Complaint saved: ${ticketNumber} | Dept: ${classification.department} | Category: ${classification.intentCategory} | Language: ${detectedLanguage} | Source: ${callSource} | User: ${userId || 'anonymous-inbound'}`);
+        console.log(`[Voice] ✅ Auto-form-fill complete: ${result.ticket.ticketNumber} | Dept: ${classification.department} | Category: ${classification.primaryCategory} | Language: ${detectedLanguage} | Source: ${callSource} | User: ${userId || 'anonymous-inbound'}`);
 
         // Cleanup session
         delete callUserMap[callSid];
