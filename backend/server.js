@@ -123,12 +123,14 @@ const authRoutes = require('./routes/auth');
 const ticketRoutes = require('./routes/tickets');
 const userRoutes = require('./routes/users');
 const voiceRoutes = require('./routes/voice');
+const aiRoutes = require('./routes/ai_routes'); // Added this line
 const smsRoutes = require('./routes/sms');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/voice', voiceRoutes);
+app.use('/api/ai', aiRoutes); // Added this line
 app.use('/api/sms', smsRoutes);
 
 // 404 handler for unknown routes

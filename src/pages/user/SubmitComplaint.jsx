@@ -5,9 +5,11 @@ import api from "../../utils/api";
 import { getCurrentLocation } from "../../utils/geolocation";
 import DEPARTMENTS, { getCategoryDepartment } from "../../data/departments";
 import toast from "react-hot-toast";
-import { HiOutlineLocationMarker, HiOutlinePhotograph } from "react-icons/hi";
+import { HiOutlineLocationMarker, HiOutlinePhotograph, HiOutlineMicrophone } from "react-icons/hi";
+import { MdStop } from "react-icons/md";
 import Map, { Marker, NavigationControl } from "react-map-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { useRef } from "react";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -37,6 +39,14 @@ export default function SubmitComplaint() {
     });
 
     const [imagePreviews, setImagePreviews] = useState([]);
+    
+    // Voice Recording State
+    const [isRecording, setIsRecording] = useState(false);
+    const [isProcessingVoice, setIsProcessingVoice] = useState(false);
+    const [recordingDuration, setRecordingDuration] = useState(0);
+    const timerRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
 
     useEffect(() => {
         if (!navigator.geolocation) {
@@ -114,6 +124,78 @@ export default function SubmitComplaint() {
         setGeoLoading(false);
     };
 
+    // --- Voice Recording Functions ---
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const recorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = recorder;
+            audioChunksRef.current = [];
+
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunksRef.current.push(e.data);
+            };
+
+            recorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                await processVoiceCommand(audioBlob);
+                // Stop all tracks to release microphone
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            recorder.start();
+            setIsRecording(true);
+            setRecordingDuration(0);
+            timerRef.current = setInterval(() => {
+                setRecordingDuration(prev => prev + 1);
+            }, 1000);
+            toast("Recording started... Speak your complaint clearly.", { icon: "🎙️" });
+        } catch (err) {
+            console.error("Microphone access error:", err);
+            toast.error("Could not access microphone. Please check permissions.");
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+            setIsProcessingVoice(true);
+            clearInterval(timerRef.current);
+        }
+    };
+
+    const processVoiceCommand = async (blob) => {
+        const formData = new FormData();
+        formData.append('audio', blob, 'recording.webm');
+
+        try {
+            const { data } = await api.post('/ai/voice-form-fill', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            if (data.success) {
+                setForm(prev => ({
+                    ...prev,
+                    category: data.primaryCategory || prev.category,
+                    department: data.department || prev.department,
+                    description: data.description || prev.description,
+                    landmark: data.landmark || prev.landmark,
+                    zone: data.zone || prev.zone,
+                    wardNumber: data.wardNumber || prev.wardNumber,
+                    locality: data.locality || prev.locality,
+                    pincode: data.pincode || prev.pincode,
+                }));
+                toast.success("Form auto-filled from your voice command!");
+            }
+        } catch (err) {
+            console.error("Voice processing error:", err);
+            toast.error(err.response?.data?.message || "Failed to process voice command.");
+        } finally {
+            setIsProcessingVoice(false);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!form.category) return toast.error("Please select a category");
@@ -159,10 +241,36 @@ export default function SubmitComplaint() {
             <div className="grid lg:grid-cols-5 gap-6 items-start">
                 <form onSubmit={handleSubmit} className="space-y-6 animate-fadeInUp lg:col-span-3">
                     <div className="card">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <span className="w-7 h-7 rounded-lg bg-[var(--color-primary)]/20 flex items-center justify-center text-sm font-bold text-[var(--color-primary-light)]">1</span>
-                            What's the issue?
-                        </h3>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-semibold flex items-center gap-2">
+                                <span className="w-7 h-7 rounded-lg bg-[var(--color-primary)]/20 flex items-center justify-center text-sm font-bold text-[var(--color-primary-light)]">1</span>
+                                What's the issue?
+                            </h3>
+                            
+                            <button
+                                type="button"
+                                onClick={isRecording ? stopRecording : startRecording}
+                                disabled={isProcessingVoice}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all shadow-sm ${
+                                    isRecording 
+                                        ? 'bg-red-500 text-white animate-pulse shadow-red-500/40' 
+                                        : 'bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 hover:scale-105 active:scale-95'
+                                }`}
+                            >
+                                {isProcessingVoice ? (
+                                    <><div className="spinner w-3.5 h-3.5 border-2 border-current" /> Auto-filling Form...</>
+                                ) : isRecording ? (
+                                    <>
+                                        <div className="w-2 h-2 rounded-full bg-white animate-ping mr-1" />
+                                        <span className="font-mono">{Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}</span>
+                                        <MdStop className="text-lg" />
+                                        <span>Stop Recording</span>
+                                    </>
+                                ) : (
+                                    <><HiOutlineMicrophone className="text-lg" /> Speak Complaint</>
+                                )}
+                            </button>
+                        </div>
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium mb-2 text-[var(--color-text-muted)]">Category</label>
