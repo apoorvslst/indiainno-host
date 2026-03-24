@@ -6,8 +6,14 @@ const userSchema = new mongoose.Schema({
     email: { type: String, required: [true, 'Email is required'], unique: true, lowercase: true, trim: true },
     password: { type: String, required: [true, 'Password is required'], minlength: 6 },
     phone: { type: String, default: '' },
-    role: { type: String, enum: ['user', 'engineer', 'admin'], default: 'user' },
-    department: { type: String, default: null },
+    role: { 
+        type: String, 
+        enum: ['citizen', 'junior_engineer', 'executive_engineer', 'senior_engineer', 'mayor', 'admin', 'user', 'engineer'], 
+        default: 'citizen' 
+    },
+    department: { type: String, default: null }, // for officials
+    zone: { type: String, default: '' }, // for officials/routing
+    wardNumber: { type: String, default: '' }, // for officials
     city: { type: String, default: '' },
     trustScore: { type: Number, default: 100, min: 0, max: 100 },
     active: { type: Boolean, default: true }

@@ -35,6 +35,9 @@ const masterTicketSchema = new mongoose.Schema({
     subCategory: { type: String, default: '' },
     department: { type: String, default: null },
     severity: { type: String, enum: ['Low', 'Medium', 'High', 'Critical'], default: 'Low' },
+    level: { type: Number, enum: [1, 2, 3, 4], default: 1 },
+    isApproved: { type: Boolean, default: null }, // null means pending, true means approved, false means rejected
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 
     // MCD Specific Location Hierarchy
     zone: { type: String, default: '' },
