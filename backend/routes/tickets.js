@@ -217,9 +217,75 @@ async function createComplaintFromData(data, user = null) {
         status: matchingTicket.status,
         masterTicketId: matchingTicket._id
     });
-    await complaint.save();
+  await complaint.save();
 
-    return { ticket: matchingTicket, rawComplaint: complaint, isNew };
+  // Auto-create implementation plan for new tickets
+  if (isNew && matchingTicket.level) {
+    try {
+      const ImplementationPlan = require('../models/ImplementationPlan');
+      const { getPlanTemplate } = require('../data/implementationPlans');
+      
+      const existingPlan = await ImplementationPlan.findOne({ masterTicketId: matchingTicket._id });
+      if (!existingPlan) {
+        const template = getPlanTemplate(matchingTicket.primaryCategory);
+        const steps = template.steps.map(step => ({
+          ...step,
+          status: 'pending',
+          beforePhotos: [],
+          duringPhotos: [],
+          afterPhotos: [],
+          juniorRemarks: '',
+          seniorRemarks: ''
+        }));
+        
+        const materials = template.materials || [];
+        const totalCost = materials.reduce((sum, m) => sum + (m.estimatedCost || 0), 0);
+        
+        const plan = new ImplementationPlan({
+          masterTicketId: matchingTicket._id,
+          ticketNumber: matchingTicket.ticketNumber,
+          category: matchingTicket.primaryCategory,
+          subCategory: matchingTicket.subCategory || '',
+          level: matchingTicket.level,
+          severity: matchingTicket.severity,
+          department: matchingTicket.department,
+          zone: matchingTicket.zone || '',
+          wardNumber: matchingTicket.wardNumber || '',
+          locality: matchingTicket.locality || '',
+          landmark: matchingTicket.landmark || '',
+          title: template.title,
+          description: template.description,
+          problemAnalysis: template.problemAnalysis,
+          steps: steps,
+          totalEstimatedHours: template.estimatedHours,
+          totalEstimatedCost: totalCost,
+          primaryMaterials: materials,
+          primaryEquipment: template.equipment || [],
+          currentStage: 'ai_generated',
+          status: 'draft',
+          aiGeneratedAt: new Date(),
+          aiGeneratedBy: 'CivicSync AI',
+          approvalHistory: [{
+            action: 'ai_generated',
+            performedBy: null,
+            performedByRole: 'ai',
+            remarks: `AI-generated implementation plan for ${matchingTicket.primaryCategory} complaint (Level ${matchingTicket.level})`,
+            timestamp: new Date()
+          }]
+        });
+        
+        await plan.save();
+        matchingTicket.implementationPlanId = plan._id;
+        await matchingTicket.save();
+        
+        console.log(`[Auto-Plan] Created implementation plan for ticket ${matchingTicket.ticketNumber} (Level ${matchingTicket.level})`);
+      }
+    } catch (planErr) {
+      console.warn('[Auto-Plan] Failed to create implementation plan:', planErr.message);
+    }
+  }
+
+  return { ticket: matchingTicket, rawComplaint: complaint, isNew };
 }
 
 // Export for use in voice.js

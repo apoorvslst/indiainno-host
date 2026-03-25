@@ -80,11 +80,14 @@ const masterTicketSchema = new mongoose.Schema({
     // Ticket Merging
     mergedTicketIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'MasterTicket' }],
 
-    // Citizen Feedback
-    citizenRating: { type: Number, default: null, min: 1, max: 5 },
-    citizenFeedbackText: { type: String, default: '' },
-    isReopened: { type: Boolean, default: false },
-    reComplaintRemark: { type: String, default: '' }
+  // Citizen Feedback
+  citizenRating: { type: Number, default: null, min: 1, max: 5 },
+  citizenFeedbackText: { type: String, default: '' },
+  isReopened: { type: Boolean, default: false },
+  reComplaintRemark: { type: String, default: '' },
+
+  // Implementation Plan Link
+  implementationPlanId: { type: mongoose.Schema.Types.ObjectId, ref: 'ImplementationPlan', default: null }
 
 }, { timestamps: true });
 

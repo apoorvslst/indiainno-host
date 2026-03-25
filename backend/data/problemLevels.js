@@ -134,10 +134,14 @@ const PROBLEM_LEVELS = [
     { id: 105, category: "Sewage_Overflow", level: 2, severity: "High", department: "water_supply" },
     { id: 106, category: "Building_Maintenance", level: 1, severity: "Low", department: "pwd" },
     { id: 107, category: "Road_Resurfacing", level: 2, severity: "Medium", department: "pwd" },
-    // Fire & Emergency categories from departments.js
-    { id: 108, category: "Fire_Hazard", level: 1, severity: "High", department: "fire" },
-    { id: 109, category: "Building_Safety", level: 2, severity: "Medium", department: "fire" },
-    { id: 110, category: "Emergency_Access_Block", level: 2, severity: "High", department: "fire" },
+// Fire & Emergency categories from departments.js - CRITICAL - Level 3
+{ id: 108, category: "Fire_Hazard", level: 3, severity: "Critical", department: "fire" },
+{ id: 109, category: "Building_Safety", level: 3, severity: "High", department: "fire" },
+{ id: 110, category: "Emergency_Access_Block", level: 3, severity: "Critical", department: "fire" },
+{ id: 111, category: "Fire_Safety_Violation", level: 3, severity: "Critical", department: "fire" },
+{ id: 112, category: "Electrical_Fire_Risk", level: 3, severity: "Critical", department: "fire" },
+{ id: 113, category: "Gas_Leak", level: 3, severity: "Critical", department: "fire" },
+{ id: 114, category: "Safety_Concern", level: 2, severity: "High", department: "police" },
 ];
 
 /**
@@ -160,9 +164,9 @@ function classifyProblemLevel(primaryCategory, subCategory) {
         match = PROBLEM_LEVELS.find(p => catNorm.includes(normalize(p.category)) || normalize(p.category).includes(catNorm));
     }
 
-    return match
-        ? { level: match.level, severity: match.severity, department: match.department }
-        : { level: 1, severity: 'Low', department: null }; // Default to Level 1
+return match
+    ? { level: match.level, severity: match.severity, department: match.department }
+    : { level: 1, severity: 'Low', department: 'municipal' }; // Default to Level 1, municipal
 }
 
 module.exports = { PROBLEM_LEVELS, classifyProblemLevel };

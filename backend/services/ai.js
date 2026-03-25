@@ -116,6 +116,8 @@ RULES (STRICTLY FOLLOW):
 - If the department is unclear, pick the closest match. Default to "municipal" if truly ambiguous.
 - For scams/fraud/cybercrime → department: "police", primaryCategory: "Safety_Concern"
 - For medical issues → department: "health"
+- For FIRE related complaints → department: "fire", primaryCategory: "Fire_Hazard" (CRITICAL severity)
+- For EMERGENCY/SAFETY issues → Use highest severity level
 - Extract location info (zone, ward, locality, pincode) if mentioned.
 
 "department" MUST be exactly ONE of:

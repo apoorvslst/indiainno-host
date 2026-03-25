@@ -86,45 +86,68 @@ export default function EngineerDashboard() {
                     {tickets.map(t => {
                         const category = t.primaryCategory || t.intentCategory;
                         return (
-                        <div key={t.id} className="card animate-fadeInUp hover:bg-[var(--color-card-hover)] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="flex items-start gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-[var(--color-surface)] flex items-center justify-center text-2xl flex-shrink-0 border border-[var(--color-border)]">
-                                    {category === "Pothole" ? "🕳️" :
-                                        category === "Streetlight" ? "💡" :
-                                            category === "Water_Leak" ? "💧" :
-                                                category === "Garbage" ? "🗑️" : "📋"}
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                                        {t.ticketNumber && <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded-sm">{t.ticketNumber}</span>}
-                                        <h3 className="font-semibold text-lg">{category?.replace(/_/g, " ")}</h3>
-                                        <span className={`badge severity-${(t.severity || "low").toLowerCase()}`}>{t.severity || "Low"} Priority</span>
-                                        <span className={`badge status-${(t.status || "open").toLowerCase()}`}>{t.status || "Open"}</span>
-                                        {t.source === 'voice_call' && <span className="badge bg-purple-100 text-purple-700">📞 Voice</span>}
-                                    </div>
-                                    <div className="flex items-center gap-4 text-sm text-[var(--color-text-muted)] mb-2 group">
-                                        <span className="flex items-center gap-1">
-                                            <HiOutlineLocationMarker className="text-[var(--color-primary)]" />
-                                            {t.landmark || t.locality || "Coordinates Only"}
-                                        </span>
-                                        {t.wardNumber && <span>🏛️ Ward {t.wardNumber}</span>}
-                                        {t.lat && t.lng && (
-                                            <a
-                                                href={`https://www.google.com/maps/dir/?api=1&destination=${t.lat},${t.lng}`}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="text-[var(--color-primary-light)] hover:underline opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
-                                            >
-                                                Directions ↗
-                                            </a>
-                                        )}
-                                    </div>
-                                    <p className="text-xs text-[var(--color-text-muted)]">
-                                        Reported {new Date(t.createdAt).toLocaleString()} • {t.complaintCount || 1} citizens affected
-                                        {t.actionHistory?.length > 0 && ` • ${t.actionHistory.length} updates`}
-                                    </p>
-                                </div>
-                            </div>
+<div key={t.id} className="card animate-fadeInUp hover:bg-[var(--color-card-hover)] flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-[var(--color-surface)] flex items-center justify-center text-2xl flex-shrink-0 border border-[var(--color-border)]">
+                  {category === "Pothole" ? "🕳️" :
+                  category === "Streetlight" ? "💡" :
+                  category === "Water_Leak" ? "💧" :
+                  category === "Garbage" ? "🗑️" :
+                  category === "Fire_Hazard" ? "🔥" :
+                  category === "Building_Safety" ? "🏗️" :
+                  category === "Sewage_Overflow" ? "🚿" :
+                  "📋"}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    {t.ticketNumber && <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded-sm">{t.ticketNumber}</span>}
+                    <h3 className="font-semibold text-lg">{category?.replace(/_/g, " ")}</h3>
+                    <span className={`badge severity-${(t.severity || "low").toLowerCase()}`}>{t.severity || "Low"} Priority</span>
+                    <span className={`badge status-${(t.status || "open").toLowerCase()}`}>{t.status || "Open"}</span>
+                    {t.source === 'voice_call' && <span className="badge bg-purple-100 text-purple-700">📞 Voice</span>}
+                    {t.level && (
+                      <span className={`badge ${t.level === 1 ? 'bg-green-100 text-green-700' : t.level === 2 ? 'bg-yellow-100 text-yellow-700' : t.level === 3 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
+                        L{t.level}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* DEPARTMENT & LEVEL INFO - PROMINENT */}
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className="px-2 py-1 rounded-md text-xs font-bold uppercase" style={{ 
+                      backgroundColor: t.department === 'fire' ? '#fee2e2' : t.department === 'health' ? '#fef3c7' : t.department === 'water_supply' ? '#dbeafe' : t.department === 'electricity' ? '#fef3c7' : t.department === 'pwd' ? '#e5e7eb' : '#f0fdf4',
+                      color: t.department === 'fire' ? '#991b1b' : t.department === 'health' ? '#92400e' : t.department === 'water_supply' ? '#1e40af' : t.department === 'electricity' ? '#92400e' : t.department === 'pwd' ? '#374151' : '#166534'
+                    }}>
+                      🏢 {t.department || 'municipal'}
+                    </span>
+                    <span className="text-xs text-[var(--color-text-muted)]">
+                      Level {t.level || 1} → {t.level === 1 ? 'Junior Engineer' : t.level === 2 ? 'Dept Head' : t.level === 3 ? 'Officer' : 'Top Authority'}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-4 text-sm text-[var(--color-text-muted)] mb-2 group">
+                    <span className="flex items-center gap-1">
+                      <HiOutlineLocationMarker className="text-[var(--color-primary)]" />
+                      {t.landmark || t.locality || "Coordinates Only"}
+                    </span>
+                    {t.wardNumber && <span>🏛️ Ward {t.wardNumber}</span>}
+                    {t.lat && t.lng && (
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${t.lat},${t.lng}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[var(--color-primary-light)] hover:underline opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
+                    >
+                      Directions ↗
+                    </a>
+                    )}
+                  </div>
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    Reported {new Date(t.createdAt).toLocaleString()} • {t.complaintCount || 1} citizens affected
+                    {t.actionHistory?.length > 0 && ` • ${t.actionHistory.length} updates`}
+                  </p>
+                </div>
+              </div>
 
                             <div className="md:text-right flex-shrink-0">
                                 {t.status === "Pending_Verification" ? (
