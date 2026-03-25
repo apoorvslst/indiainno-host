@@ -77,6 +77,9 @@ const masterTicketSchema = new mongoose.Schema({
     resolutionRemarks: { type: String, default: '' },
     resolutionLocation: { type: pointSchema, default: null },
 
+    // Ticket Merging
+    mergedTicketIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'MasterTicket' }],
+
     // Citizen Feedback
     citizenRating: { type: Number, default: null, min: 1, max: 5 },
     citizenFeedbackText: { type: String, default: '' },

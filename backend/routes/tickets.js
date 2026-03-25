@@ -2,7 +2,9 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const { MasterTicket, RawComplaint } = require('../models/Ticket');
+const User = require('../models/User');
 const { protect, authorize } = require('../middleware/authMiddleware');
+const { classifyProblemLevel } = require('../data/problemLevels');
 
 const SEVERITY_THRESHOLDS = { Medium: 3, High: 10, Critical: 25 };
 const DEDUP_RADIUS_METERS = 50;
@@ -40,6 +42,39 @@ function formatTicket(t) {
 function calculateSlaDeadline(department) {
     const hours = SLA_HOURS[department] || 72;
     return new Date(Date.now() + hours * 60 * 60 * 1000);
+}
+
+// ── Auto-assign to junior with fewest active tickets ──
+async function autoAssignJunior(department, city) {
+    if (!department) return null;
+    try {
+        const juniors = await User.find({
+            role: { $in: ['junior', 'engineer'] },
+            department: department,
+            active: true,
+            ...(city ? { city: { $regex: city, $options: 'i' } } : {})
+        }).select('_id name').lean();
+
+        if (juniors.length === 0) return null;
+
+        // Count active (non-closed) tickets per junior
+        const counts = await Promise.all(
+            juniors.map(async (j) => {
+                const count = await MasterTicket.countDocuments({
+                    $or: [{ assignedJuniorId: j._id }, { assignedEngineerId: j._id }],
+                    status: { $nin: ['Closed', 'Rejected', 'Invalid_Spam'] }
+                });
+                return { junior: j, count };
+            })
+        );
+
+        // Sort by fewest active tickets
+        counts.sort((a, b) => a.count - b.count);
+        return counts[0].junior;
+    } catch (err) {
+        console.warn('[AutoAssign] Failed:', err.message);
+        return null;
+    }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -103,14 +138,26 @@ async function createComplaintFromData(data, user = null) {
         await matchingTicket.save();
     } else {
         isNew = true;
+
+        // Auto-classify level from top 100 problems
+        const classification = classifyProblemLevel(category, subCategory);
+        const ticketLevel = classification.level;
+        const ticketSeverity = severity || classification.severity || 'Low';
+        const ticketDept = department || classification.department || null;
+
+        // Level 1 = auto-approved, Level 2+ = pending approval
+        const autoApproved = ticketLevel === 1;
+
         matchingTicket = new MasterTicket({
             primaryCategory: category,
             subCategory: subCategory || '',
             description: description,
-            severity: severity || "Low",
+            severity: ticketSeverity,
+            level: ticketLevel,
+            isApproved: autoApproved ? true : null, // null = pending
             complaintCount: 1,
-            status: "Registered",
-            department: department || null,
+            status: autoApproved ? 'Open' : 'Registered',
+            department: ticketDept,
             needsManualGeo: !hasLocation,
             landmark: landmark || "",
             city: user?.city || data.city || "",
@@ -127,14 +174,30 @@ async function createComplaintFromData(data, user = null) {
             complainantPhone: user?.phone || data.complainantPhone || '',
             complainantEmail: user?.email || data.complainantEmail || '',
             location: hasLocation ? { type: "Point", coordinates: [Number(lng), Number(lat)] } : undefined,
-            slaDeadline: calculateSlaDeadline(department),
+            slaDeadline: calculateSlaDeadline(ticketDept),
             actionHistory: [{
-                newStatus: 'Registered',
-                remarks: `Complaint registered via ${source || 'web_form'}`,
+                newStatus: autoApproved ? 'Open' : 'Registered',
+                remarks: `Complaint registered via ${source || 'web_form'} — Level ${ticketLevel} ${autoApproved ? '(auto-approved)' : '(pending approval)'}`,
                 progressPercentage: 0
             }]
         });
         await matchingTicket.save();
+
+        // Level 1 → auto-assign to junior with fewest active tickets
+        if (autoApproved && ticketDept) {
+            const assignee = await autoAssignJunior(ticketDept, user?.city || data.city);
+            if (assignee) {
+                matchingTicket.assignedJuniorId = assignee._id;
+                matchingTicket.assignedEngineerId = assignee._id;
+                matchingTicket.status = 'Assigned';
+                matchingTicket.actionHistory.push({
+                    newStatus: 'Assigned',
+                    remarks: `Auto-assigned to ${assignee.name} (fewest active tickets)`,
+                    progressPercentage: 0
+                });
+                await matchingTicket.save();
+            }
+        }
     }
 
     // Save raw complaint
@@ -210,7 +273,11 @@ router.get('/my-complaints', protect, async (req, res) => {
         )];
 
         const tickets = ticketIds.length
-            ? await MasterTicket.find({ _id: { $in: ticketIds } }).lean().maxTimeMS(10000)
+            ? await MasterTicket.find({ _id: { $in: ticketIds } })
+                .populate('assignedJuniorId', 'name phone department role')
+                .populate('assignedEngineerId', 'name phone department role')
+                .populate('approvedBy', 'name department role')
+                .lean().maxTimeMS(10000)
             : [];
 
         const ticketMap = new Map(tickets.map(t => [t._id.toString(), t]));
@@ -276,11 +343,8 @@ router.get('/master', protect, async (req, res) => {
         // Role-based filtering
         if (['junior', 'engineer'].includes(userRole) && req.user.department) {
             query.department = req.user.department;
-            query.$or = [
-                { assignedJuniorId: req.user._id },
-                { assignedEngineerId: req.user._id },
-                { assignedJuniorId: null, assignedEngineerId: null }
-            ];
+            // Show ALL department tickets so junior can see full workload
+            // Frontend separates "My Tickets" (assigned to me) from "Other" client-side
             query.status = { $ne: 'Closed' };
         } else if (userRole === 'dept_head' && req.user.department) {
             query.department = req.user.department;
@@ -301,13 +365,41 @@ router.get('/master', protect, async (req, res) => {
     }
 });
 
-// ─── GET /api/tickets/master/:id ─── Single ticket detail
+// ─── GET /api/tickets/master/:id ─── Single ticket detail (with transparency)
 router.get('/master/:id', protect, async (req, res) => {
     try {
         const ticket = await MasterTicket.findById(req.params.id)
-            .populate('assignedEngineerId', 'name email phone');
+            .populate('assignedEngineerId', 'name phone department role')
+            .populate('assignedJuniorId', 'name phone department role')
+            .populate('approvedBy', 'name phone department role')
+            .populate('mergedTicketIds', 'ticketNumber status');
         if (!ticket) return res.status(404).json({ message: "Ticket not found" });
-        res.json(formatTicket(ticket));
+
+        // Populate actionHistory.updatedBy for timeline transparency
+        const ticketObj = ticket.toObject();
+        if (ticketObj.actionHistory && ticketObj.actionHistory.length > 0) {
+            const userIds = [...new Set(
+                ticketObj.actionHistory
+                    .map(a => a.updatedBy)
+                    .filter(id => id && mongoose.Types.ObjectId.isValid(id))
+                    .map(id => id.toString())
+            )];
+            if (userIds.length > 0) {
+                const users = await User.find({ _id: { $in: userIds } })
+                    .select('name role department').lean();
+                const userMap = new Map(users.map(u => [u._id.toString(), u]));
+                ticketObj.actionHistory = ticketObj.actionHistory.map(a => ({
+                    ...a,
+                    updatedByUser: a.updatedBy ? userMap.get(a.updatedBy.toString()) || null : null
+                }));
+            }
+        }
+
+        res.json({
+            ...ticketObj, id: ticketObj._id,
+            lat: ticketObj.location ? ticketObj.location.coordinates[1] : null,
+            lng: ticketObj.location ? ticketObj.location.coordinates[0] : null,
+        });
     } catch (err) {
         console.error('[Ticket Detail Error]', err);
         res.status(500).json({ message: err.message });
@@ -512,6 +604,215 @@ router.get('/stats', protect, authorize('officer', 'dept_head', 'admin'), async 
         ]);
         res.json({ total, open, critical, pendingGeo });
     } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// ─── GET /api/tickets/pending-approval ─── Pending Level 2+ tickets, sorted by priority
+router.get('/pending-approval', protect, authorize('officer', 'dept_head', 'admin'), async (req, res) => {
+    try {
+        const query = { isApproved: null, status: 'Registered' };
+        const userCity = (req.user.city || '').trim();
+        if (userCity) query.city = userCity;
+
+        // Dept head sees only their department
+        if (req.user.role === 'dept_head' && req.user.department) {
+            query.department = req.user.department;
+            query.level = 2; // dept_head can only approve L2
+        }
+
+        // Sort by complaintCount descending = highest priority first
+        const tickets = await MasterTicket.find(query)
+            .sort({ complaintCount: -1, severity: -1, createdAt: 1 })
+            .populate('complainantId', 'name phone');
+
+        res.json(tickets.map(formatTicket));
+    } catch (err) {
+        console.error('[Pending Approval Error]', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// ─── GET /api/tickets/master/:id/suggest-assignee ─── Suggest juniors for assignment
+router.get('/master/:id/suggest-assignee', protect, authorize('officer', 'dept_head', 'admin'), async (req, res) => {
+    try {
+        const ticket = await MasterTicket.findById(req.params.id);
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        // Find all juniors in same department + city
+        const juniorQuery = {
+            role: { $in: ['junior', 'engineer'] },
+            active: true,
+        };
+        if (ticket.department) juniorQuery.department = ticket.department;
+        if (ticket.city) juniorQuery.city = { $regex: ticket.city, $options: 'i' };
+
+        const juniors = await User.find(juniorQuery)
+            .select('_id name phone department city performancePoints').lean();
+
+        if (juniors.length === 0) {
+            return res.json({ suggestion: null, juniors: [], message: 'No juniors available in this department' });
+        }
+
+        // Count active tickets per junior
+        const ranked = await Promise.all(
+            juniors.map(async (j) => {
+                const activeTickets = await MasterTicket.countDocuments({
+                    $or: [{ assignedJuniorId: j._id }, { assignedEngineerId: j._id }],
+                    status: { $nin: ['Closed', 'Rejected', 'Invalid_Spam'] }
+                });
+                return { ...j, activeTickets };
+            })
+        );
+
+        // Sort by fewest active tickets, then highest performance points
+        ranked.sort((a, b) => a.activeTickets - b.activeTickets || b.performancePoints - a.performancePoints);
+
+        res.json({
+            suggestion: ranked[0], // The recommended assignee
+            juniors: ranked,       // Full ranked list for manual override
+        });
+    } catch (err) {
+        console.error('[Suggest Assignee Error]', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// ─── PUT /api/tickets/master/:id/approve ─── Senior approves Level 2+ tickets
+// Accepts optional `assignToJuniorId` for manual override; otherwise uses suggestion
+router.put('/master/:id/approve', protect, authorize('officer', 'dept_head', 'admin'), async (req, res) => {
+    try {
+        const ticket = await MasterTicket.findById(req.params.id);
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        if (ticket.isApproved === true) {
+            return res.status(400).json({ message: 'Ticket is already approved' });
+        }
+
+        // Dept head can only approve Level 2, officer can approve any
+        const isOfficer = ['officer', 'admin'].includes(req.user.role);
+        if (!isOfficer && ticket.level > 2) {
+            return res.status(403).json({ message: 'Only officers can approve Level 3+ tickets' });
+        }
+
+        const previousStatus = ticket.status;
+        ticket.isApproved = true;
+        ticket.approvedBy = req.user._id;
+        ticket.status = 'Open';
+
+        ticket.actionHistory.push({
+            updatedBy: req.user._id,
+            previousStatus,
+            newStatus: 'Open',
+            remarks: `Approved by ${req.user.name} (Level ${ticket.level} ticket)`,
+            progressPercentage: 0
+        });
+
+        await ticket.save();
+
+        // Assignment: manual override or auto-suggestion
+        const { assignToJuniorId } = req.body;
+
+        if (assignToJuniorId) {
+            // Manual assignment by senior officer
+            const junior = await User.findById(assignToJuniorId).select('name');
+            if (junior) {
+                ticket.assignedJuniorId = junior._id;
+                ticket.assignedEngineerId = junior._id;
+                ticket.status = 'Assigned';
+                ticket.actionHistory.push({
+                    updatedBy: req.user._id,
+                    previousStatus: 'Open',
+                    newStatus: 'Assigned',
+                    remarks: `Manually assigned to ${junior.name} by ${req.user.name}`,
+                    progressPercentage: 0
+                });
+                await ticket.save();
+            }
+        } else if (ticket.department) {
+            // Auto-suggest: assign to junior with fewest tickets
+            const assignee = await autoAssignJunior(ticket.department, ticket.city);
+            if (assignee) {
+                ticket.assignedJuniorId = assignee._id;
+                ticket.assignedEngineerId = assignee._id;
+                ticket.status = 'Assigned';
+                ticket.actionHistory.push({
+                    updatedBy: req.user._id,
+                    previousStatus: 'Open',
+                    newStatus: 'Assigned',
+                    remarks: `Auto-assigned to ${assignee.name} (fewest active tickets — suggested by system)`,
+                    progressPercentage: 0
+                });
+                await ticket.save();
+            }
+        }
+
+        const result = await MasterTicket.findById(ticket._id)
+            .populate('assignedJuniorId', 'name phone department')
+            .populate('approvedBy', 'name phone department');
+        res.json(formatTicket(result));
+    } catch (err) {
+        console.error('[Ticket Approve Error]', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// ─── PUT /api/tickets/master/:id/merge ─── Merge duplicate tickets
+router.put('/master/:id/merge', protect, authorize('officer', 'dept_head', 'admin'), async (req, res) => {
+    try {
+        const { targetTicketId } = req.body;
+        if (!targetTicketId) return res.status(400).json({ message: 'targetTicketId is required' });
+
+        const sourceTicket = await MasterTicket.findById(req.params.id);
+        const targetTicket = await MasterTicket.findById(targetTicketId);
+
+        if (!sourceTicket) return res.status(404).json({ message: 'Source ticket not found' });
+        if (!targetTicket) return res.status(404).json({ message: 'Target ticket not found' });
+        if (sourceTicket._id.toString() === targetTicket._id.toString()) {
+            return res.status(400).json({ message: 'Cannot merge a ticket into itself' });
+        }
+
+        // Move complaints from source → target
+        await RawComplaint.updateMany(
+            { masterTicketId: sourceTicket._id },
+            { $set: { masterTicketId: targetTicket._id } }
+        );
+
+        // Update target ticket
+        targetTicket.complaintCount += sourceTicket.complaintCount;
+        targetTicket.severity = calculateSeverity(targetTicket.complaintCount);
+        if (sourceTicket.citizenImages.length > 0) {
+            targetTicket.citizenImages.push(...sourceTicket.citizenImages);
+        }
+        if (!targetTicket.mergedTicketIds) targetTicket.mergedTicketIds = [];
+        targetTicket.mergedTicketIds.push(sourceTicket._id);
+        targetTicket.actionHistory.push({
+            updatedBy: req.user._id,
+            previousStatus: targetTicket.status,
+            newStatus: targetTicket.status,
+            remarks: `Merged ticket ${sourceTicket.ticketNumber} into this ticket (${sourceTicket.complaintCount} complaints absorbed)`,
+            progressPercentage: targetTicket.progressPercent
+        });
+        await targetTicket.save();
+
+        // Close source ticket
+        sourceTicket.status = 'Closed';
+        sourceTicket.actionHistory.push({
+            updatedBy: req.user._id,
+            previousStatus: sourceTicket.status,
+            newStatus: 'Closed',
+            remarks: `Merged into ticket ${targetTicket.ticketNumber}`,
+            progressPercentage: 100
+        });
+        await sourceTicket.save();
+
+        res.json({
+            message: `Merged ${sourceTicket.ticketNumber} → ${targetTicket.ticketNumber}`,
+            sourceTicket: formatTicket(sourceTicket),
+            targetTicket: formatTicket(targetTicket)
+        });
+    } catch (err) {
+        console.error('[Ticket Merge Error]', err);
         res.status(500).json({ message: err.message });
     }
 });

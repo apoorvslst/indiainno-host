@@ -132,7 +132,76 @@ export default function MyComplaints() {
                                             {c.ticket?.complaintCount > 1 && (
                                                 <span className="text-[var(--color-warning)]">👥 {c.ticket.complaintCount} reports</span>
                                             )}
+                                            {c.ticket?.level && (
+                                                <span className={`font-bold ${c.ticket.level === 1 ? 'text-green-600' : c.ticket.level === 2 ? 'text-yellow-600' : c.ticket.level === 3 ? 'text-orange-600' : 'text-red-600'}`}>
+                                                    L{c.ticket.level}
+                                                </span>
+                                            )}
                                         </div>
+
+                                        {/* ─── Assigned Official + Responsibility Info ─── */}
+                                        {(() => {
+                                            const ticket = c.ticket;
+                                            if (!ticket) return null;
+                                            const level = ticket.level;
+                                            const assigned = ticket.assignedJuniorId || ticket.assignedEngineerId;
+                                            const approver = ticket.approvedBy;
+                                            const isPending = ticket.isApproved === null;
+                                            const levelLabels = {
+                                                1: { role: 'Junior Engineer / Gramsevak', color: 'green' },
+                                                2: { role: 'Dept Head / BDO', color: 'yellow' },
+                                                3: { role: 'Officer / Commissioner', color: 'orange' },
+                                                4: { role: 'Top Authority / SDM / Mayor', color: 'red' },
+                                            };
+                                            const levelInfo = levelLabels[level] || levelLabels[1];
+
+                                            return (
+                                                <div className="mt-2 space-y-1.5">
+                                                    {/* Responsible Authority per Level */}
+                                                    <div className={`text-xs px-3 py-1.5 rounded-md bg-${levelInfo.color}-50 text-${levelInfo.color}-800 border border-${levelInfo.color}-100`}
+                                                        style={{
+                                                            backgroundColor: level === 1 ? '#f0fdf4' : level === 2 ? '#fefce8' : level === 3 ? '#fff7ed' : '#fef2f2',
+                                                            color: level === 1 ? '#166534' : level === 2 ? '#854d0e' : level === 3 ? '#9a3412' : '#991b1b',
+                                                            borderColor: level === 1 ? '#bbf7d0' : level === 2 ? '#fef08a' : level === 3 ? '#fed7aa' : '#fecaca'
+                                                        }}>
+                                                        <strong>Level {level} →</strong> Responsible: <strong>{levelInfo.role}</strong>
+                                                        {isPending && level >= 2 && ` (⏳ Awaiting ${level === 2 ? 'Dept Head' : 'Officer'} approval)`}
+                                                    </div>
+
+                                                    {/* Assigned Engineer with Phone */}
+                                                    {assigned && (
+                                                        <div className="flex items-center gap-3 text-xs px-3 py-2 rounded-md border"
+                                                            style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1e40af' }}>
+                                                            <span className="font-bold">👷 Assigned Engineer:</span>
+                                                            <span className="font-semibold">{assigned.name || 'Official'}</span>
+                                                            {assigned.phone && <span>📞 {assigned.phone}</span>}
+                                                            {assigned.department && <span>• {assigned.department}</span>}
+                                                            {assigned.role && <span className="opacity-60">({assigned.role})</span>}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Approving Officer with Phone (for Level 2+) */}
+                                                    {approver && typeof approver === 'object' && (
+                                                        <div className="flex items-center gap-3 text-xs px-3 py-2 rounded-md border"
+                                                            style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534' }}>
+                                                            <span className="font-bold">✅ Approved by:</span>
+                                                            <span className="font-semibold">{approver.name}</span>
+                                                            {approver.phone && <span>📞 {approver.phone}</span>}
+                                                            {approver.department && <span>• {approver.department}</span>}
+                                                            {approver.role && <span className="opacity-60">({approver.role})</span>}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Pending: not assigned, waiting for approval */}
+                                                    {isPending && !assigned && (
+                                                        <div className="text-xs px-3 py-2 rounded-md border"
+                                                            style={{ backgroundColor: '#fffbeb', borderColor: '#fde68a', color: '#92400e' }}>
+                                                            ⏳ Awaiting approval from <strong>{level === 2 ? 'Dept Head / BDO' : level === 3 ? 'Officer / Commissioner' : 'Top Authority / SDM'}</strong> before a junior engineer is assigned
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
 
