@@ -144,9 +144,13 @@ app.use((err, req, res, _next) => {
     res.status(500).json({ message: 'Internal server error' });
 });
 
+// CronService for automated SLA deductions
+const { startCronService } = require('./services/cronService');
+
 // Connect DB then start server
 const PORT = process.env.PORT || 5000;
 connectDB().then(() => {
+    startCronService();
     app.listen(PORT, () => {
         console.log(`\n✅ [CivicSync] Server running on http://localhost:${PORT}`);
         console.log(`📊 [API Routes]`);

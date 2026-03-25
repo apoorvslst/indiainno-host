@@ -62,6 +62,8 @@ const masterTicketSchema = new mongoose.Schema({
         default: 'Registered'
     },
     assignedEngineerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    assignedJuniorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    areaMode: { type: String, enum: ['urban', 'rural'], default: 'urban' },
     slaDeadline: { type: Date, default: null },
     escalationLevel: { type: Number, default: 0 },
 

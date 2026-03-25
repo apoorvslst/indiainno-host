@@ -1,25 +1,46 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { getRoleTitle } from "../config/roleConfig";
 import { HiOutlineMenu, HiOutlineX, HiOutlineLogout } from "react-icons/hi";
 import { useState } from "react";
 
 const NAV_LINKS = {
+    citizen: [
+        { to: "/citizen", label: "Dashboard", icon: "📊" },
+        { to: "/citizen/submit", label: "Submit Complaint", icon: "📝" },
+        { to: "/citizen/complaints", label: "My Complaints", icon: "📋" },
+        { to: "/citizen/map", label: "City Map", icon: "🗺️" },
+    ],
     user: [
         { to: "/citizen", label: "Dashboard", icon: "📊" },
         { to: "/citizen/submit", label: "Submit Complaint", icon: "📝" },
         { to: "/citizen/complaints", label: "My Complaints", icon: "📋" },
         { to: "/citizen/map", label: "City Map", icon: "🗺️" },
     ],
+    junior: [
+        { to: "/junior", label: "Dashboard", icon: "📊" },
+    ],
     engineer: [
-        { to: "/engineer", label: "Dashboard", icon: "🔧" },
+        { to: "/junior", label: "Dashboard", icon: "📊" },
+    ],
+    dept_head: [
+        { to: "/dept-head", label: "Dashboard", icon: "📊" },
+    ],
+    officer: [
+        { to: "/officer", label: "Dashboard", icon: "📊" },
+        { to: "/officer/tickets", label: "Tickets", icon: "🎫" },
+        { to: "/officer/map", label: "Live Map", icon: "🗺️" },
+        { to: "/officer/engineers", label: "Officials", icon: "👷" },
+        { to: "/officer/departments", label: "Departments", icon: "🏛️" },
+        { to: "/officer/manual-queue", label: "Manual Queue", icon: "📌" },
     ],
     admin: [
-        { to: "/admin", label: "Dashboard", icon: "📊" },
-        { to: "/admin/tickets", label: "Tickets", icon: "🎫" },
-        { to: "/admin/map", label: "Live Map", icon: "🗺️" },
-        { to: "/admin/engineers", label: "Engineers", icon: "👷" },
-        { to: "/admin/departments", label: "Departments", icon: "🏛️" },
-        { to: "/admin/manual-queue", label: "Manual Queue", icon: "📌" },
+        { to: "/officer", label: "Dashboard", icon: "📊" },
+        { to: "/officer/tickets", label: "Tickets", icon: "🎫" },
+        { to: "/officer/map", label: "Live Map", icon: "🗺️" },
+        { to: "/officer/engineers", label: "Officials", icon: "👷" },
+        { to: "/officer/departments", label: "Departments", icon: "🏛️" },
+        { to: "/officer/manual-queue", label: "Manual Queue", icon: "📌" },
     ],
 };
 
@@ -31,8 +52,10 @@ export default function Navbar() {
 
     if (!user) return null;
 
-    const links = NAV_LINKS[userProfile?.role] || [];
-    const roleName = userProfile?.role === "admin" ? "Senior Officer" : userProfile?.role === "engineer" ? "Engineer" : "Citizen";
+    const role = userProfile?.role || "citizen";
+    const mode = userProfile?.mode || "urban";
+    const links = NAV_LINKS[role] || NAV_LINKS.citizen;
+    const roleName = getRoleTitle(role, mode);
 
     const handleLogout = async () => {
         await logout();
@@ -55,6 +78,19 @@ export default function Navbar() {
                             <div style={{ fontSize: 11, color: "#64748b", fontWeight: 500 }}>{roleName}</div>
                         </div>
                     </Link>
+                    {/* Mode badge */}
+                    {["junior", "dept_head", "officer", "engineer", "admin"].includes(role) && (
+                        <div style={{
+                            marginTop: 8, fontSize: 10, fontWeight: 700,
+                            padding: "3px 8px", borderRadius: 4, display: "inline-block",
+                            background: mode === "urban" ? "#eff6ff" : "#f0fdf4",
+                            color: mode === "urban" ? "#1e40af" : "#15803d",
+                            border: `1px solid ${mode === "urban" ? "#bfdbfe" : "#bbf7d0"}`,
+                            textTransform: "uppercase", letterSpacing: "0.5px"
+                        }}>
+                            {mode === "urban" ? "🏙️ URBAN" : "🌾 RURAL"}
+                        </div>
+                    )}
                 </div>
 
                 <nav style={{ display: "flex", flexDirection: "column", marginTop: 8 }}>

@@ -260,17 +260,30 @@ router.get('/nearby', protect, async (req, res) => {
 router.get('/master', protect, async (req, res) => {
     try {
         const query = {};
-        const assignedDistrict = (req.user.city || '').trim();
-        if (assignedDistrict) {
-            query.city = assignedDistrict;
-        } else if (['admin', 'engineer'].includes(req.user.role)) {
+        const userRole = req.user.role;
+        const userCity = (req.user.city || '').trim();
+        const userDistrict = (req.user.district || '').trim();
+
+        // Location filtering
+        if (req.user.mode === 'rural' && userDistrict) {
+            query.city = { $regex: userDistrict, $options: 'i' };
+        } else if (userCity) {
+            query.city = userCity;
+        } else if (['officer', 'admin', 'dept_head', 'junior', 'engineer'].includes(userRole)) {
             return res.json([]);
         }
 
-        if (req.user.role === 'engineer' && req.user.department) {
+        // Role-based filtering
+        if (['junior', 'engineer'].includes(userRole) && req.user.department) {
             query.department = req.user.department;
-            query.$or = [{ assignedEngineerId: req.user._id }, { assignedEngineerId: null }];
+            query.$or = [
+                { assignedJuniorId: req.user._id },
+                { assignedEngineerId: req.user._id },
+                { assignedJuniorId: null, assignedEngineerId: null }
+            ];
             query.status = { $ne: 'Closed' };
+        } else if (userRole === 'dept_head' && req.user.department) {
+            query.department = req.user.department;
         } else if (req.query.needsManualGeo === 'true') {
             query.needsManualGeo = true;
             query.status = { $nin: ['Closed', 'Invalid_Spam'] };
@@ -278,6 +291,7 @@ router.get('/master', protect, async (req, res) => {
 
         const tickets = await MasterTicket.find(query)
             .populate('assignedEngineerId', 'name email phone department')
+            .populate('assignedJuniorId', 'name email phone department')
             .sort({ updatedAt: -1 });
 
         res.json(tickets.map(formatTicket));
@@ -300,51 +314,62 @@ router.get('/master/:id', protect, async (req, res) => {
     }
 });
 
-// ─── PUT /api/tickets/master/:id ─── Update ticket (admin/engineer)
-router.put('/master/:id', protect, authorize('admin', 'engineer'), async (req, res) => {
+// ─── PUT /api/tickets/master/:id ─── Update ticket (officer/dept_head/junior)
+router.put('/master/:id', protect, authorize('officer', 'dept_head', 'junior', 'admin', 'engineer'), async (req, res) => {
     try {
         const ticket = await MasterTicket.findById(req.params.id);
         if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
 
-        const isAdmin = req.user.role === 'admin';
-        const isEngineer = req.user.role === 'engineer';
-        const isAssignedEngineer = ticket.assignedEngineerId && ticket.assignedEngineerId.toString() === req.user._id.toString();
-        const isEligibleUnassignedEngineer = !ticket.assignedEngineerId && req.user.department && ticket.department === req.user.department;
+        const isOfficer = ['officer', 'admin'].includes(req.user.role);
+        const isDeptHead = req.user.role === 'dept_head';
+        const isJunior = ['junior', 'engineer'].includes(req.user.role);
+        const isAssignedJunior = (ticket.assignedJuniorId && ticket.assignedJuniorId.toString() === req.user._id.toString()) ||
+            (ticket.assignedEngineerId && ticket.assignedEngineerId.toString() === req.user._id.toString());
+        const isEligibleUnassignedJunior = !ticket.assignedJuniorId && !ticket.assignedEngineerId && req.user.department && ticket.department === req.user.department;
 
-        if (isEngineer && !isAssignedEngineer && !isEligibleUnassignedEngineer) {
-            return res.status(403).json({ message: 'Engineers can only update assigned or own-department unassigned tickets' });
+        if (isJunior && !isAssignedJunior && !isEligibleUnassignedJunior) {
+            return res.status(403).json({ message: 'You can only update assigned or own-department unassigned tickets' });
         }
 
-        if (isEngineer) {
-            const restrictedFields = ['status', 'assignedEngineerId', 'needsManualGeo', 'severity', 'complaintCount', 'department', 'city', 'lat', 'lng'];
+        if (isJunior) {
+            const restrictedFields = ['status', 'assignedEngineerId', 'assignedJuniorId', 'needsManualGeo', 'severity', 'complaintCount', 'department', 'city', 'lat', 'lng'];
             const attemptedRestrictedField = restrictedFields.some((field) => req.body[field] !== undefined);
             if (attemptedRestrictedField) {
-                return res.status(403).json({ message: 'Engineers are not allowed to modify admin-controlled fields' });
+                return res.status(403).json({ message: 'Junior officials are not allowed to modify restricted fields' });
             }
         }
 
         const previousStatus = ticket.status;
 
         // Dynamic field updates
-        const allowedFields = ['status', 'assignedEngineerId', 'needsManualGeo', 'resolutionRemarks', 'severity', 'complaintCount', 'department', 'landmark', 'city', 'progressPercent', 'zone', 'wardNumber', 'locality', 'pincode'];
+        const allowedFields = ['status', 'assignedEngineerId', 'assignedJuniorId', 'needsManualGeo', 'resolutionRemarks', 'severity', 'complaintCount', 'department', 'landmark', 'city', 'progressPercent', 'zone', 'wardNumber', 'locality', 'pincode'];
         allowedFields.forEach(field => {
             if (req.body[field] !== undefined) {
-                if (isEngineer && !['progressPercent', 'resolutionRemarks'].includes(field)) return;
-                if (field === 'assignedEngineerId' && !req.body[field]) {
+                if (isJunior && !['progressPercent', 'resolutionRemarks'].includes(field)) return;
+                if ((field === 'assignedEngineerId' || field === 'assignedJuniorId') && !req.body[field]) {
                     ticket[field] = null;
                 } else {
                     ticket[field] = req.body[field];
+                    // Keep both fields in sync
+                    if (field === 'assignedJuniorId') ticket.assignedEngineerId = req.body[field];
+                    if (field === 'assignedEngineerId') ticket.assignedJuniorId = req.body[field];
                 }
             }
         });
 
-        if (isEngineer && req.body.progressPercent !== undefined && Number(req.body.progressPercent) < 100) {
+        if (isJunior && req.body.progressPercent !== undefined && Number(req.body.progressPercent) < 100) {
             ticket.status = 'In_Progress';
         }
 
-        // Manual coordinate fix from Admin
-        if (isAdmin && hasGeoCoordinates(req.body.lat, req.body.lng)) {
+        // Manual coordinate fix from Officer/DeptHead
+        if ((isOfficer || isDeptHead) && hasGeoCoordinates(req.body.lat, req.body.lng)) {
             ticket.location = { type: 'Point', coordinates: [Number(req.body.lng), Number(req.body.lat)] };
+        }
+
+        // Update junior's lastActiveDate when they update a ticket
+        if (isJunior) {
+            req.user.lastActiveDate = new Date();
+            await req.user.save();
         }
 
         // Engineer resolution submission
@@ -467,14 +492,23 @@ router.post('/master/:id/upvote', protect, authorize('user'), async (req, res) =
     }
 });
 
-// ─── GET /api/tickets/stats ─── Dashboard stats (admin)
-router.get('/stats', protect, authorize('admin'), async (req, res) => {
+// ─── GET /api/tickets/stats ─── Dashboard stats (officer/dept_head)
+router.get('/stats', protect, authorize('officer', 'dept_head', 'admin'), async (req, res) => {
     try {
+        const baseQuery = {};
+        const userCity = (req.user.city || '').trim();
+        if (userCity) baseQuery.city = userCity;
+
+        // dept_head sees only their department
+        if (req.user.role === 'dept_head' && req.user.department) {
+            baseQuery.department = req.user.department;
+        }
+
         const [total, open, critical, pendingGeo] = await Promise.all([
-            MasterTicket.countDocuments(),
-            MasterTicket.countDocuments({ status: { $nin: ['Closed', 'Invalid_Spam'] } }),
-            MasterTicket.countDocuments({ severity: 'Critical', status: { $nin: ['Closed'] } }),
-            MasterTicket.countDocuments({ needsManualGeo: true, status: { $nin: ['Closed'] } })
+            MasterTicket.countDocuments(baseQuery),
+            MasterTicket.countDocuments({ ...baseQuery, status: { $nin: ['Closed', 'Invalid_Spam'] } }),
+            MasterTicket.countDocuments({ ...baseQuery, severity: 'Critical', status: { $nin: ['Closed'] } }),
+            MasterTicket.countDocuments({ ...baseQuery, needsManualGeo: true, status: { $nin: ['Closed'] } })
         ]);
         res.json({ total, open, critical, pendingGeo });
     } catch (err) {
