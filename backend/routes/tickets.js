@@ -29,6 +29,14 @@ function hasGeoCoordinates(lat, lng) {
     return Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
 }
 
+function calculatePhase(percent) {
+    if (percent <= 20) return 1;
+    if (percent <= 40) return 2;
+    if (percent <= 60) return 3;
+    if (percent <= 80) return 4;
+    return 5;
+}
+
 function formatTicket(t) {
     const obj = t.toObject ? t.toObject() : t;
     return {
@@ -293,32 +301,40 @@ router.createComplaintFromData = createComplaintFromData;
 
 // ─── POST /api/tickets/complaint ─── Submit a new complaint (web form)
 router.post('/complaint', protect, async (req, res) => {
-    try {
-        const { category, primaryCategory, subCategory, description, landmark,
-            lat, lng, accuracy, department,
-            zone, wardNumber, locality, pincode,
-            citizenImages, isAnonymous } = req.body;
-
-        const result = await createComplaintFromData({
-            primaryCategory: primaryCategory || category,
-            subCategory, description, landmark,
-            lat, lng, accuracy, department,
-            zone, wardNumber, locality, pincode,
-            citizenImages, isAnonymous,
-            source: 'web_form'
-        }, req.user);
-
-        res.status(201).json({
-            ticketId: result.ticket._id,
-            isNew: result.isNew,
-            ticket: formatTicket(result.ticket),
-            needsManualGeo: result.ticket.needsManualGeo
-        });
-
-    } catch (err) {
-        console.error('[Complaint Submit Error]', err);
-        res.status(500).json({ message: err.message || 'Failed to submit complaint' });
+  try {
+    const user = await User.findById(req.user._id);
+    if (user && user.isBanned) {
+      return res.status(403).json({ 
+        message: 'Your account has been banned due to: ' + (user.banReason || 'Policy violation'),
+        isBanned: true
+      });
     }
+
+    const { category, primaryCategory, subCategory, description, landmark,
+      lat, lng, accuracy, department,
+      zone, wardNumber, locality, pincode,
+      citizenImages, isAnonymous } = req.body;
+
+    const result = await createComplaintFromData({
+      primaryCategory: primaryCategory || category,
+      subCategory, description, landmark,
+      lat, lng, accuracy, department,
+      zone, wardNumber, locality, pincode,
+      citizenImages, isAnonymous,
+      source: 'web_form'
+    }, req.user);
+
+    res.status(201).json({
+      ticketId: result.ticket._id,
+      isNew: result.isNew,
+      ticket: formatTicket(result.ticket),
+      needsManualGeo: result.ticket.needsManualGeo
+    });
+
+  } catch (err) {
+    console.error('[Complaint Submit Error]', err);
+    res.status(500).json({ message: err.message || 'Failed to submit complaint' });
+  }
 });
 
 // ─── GET /api/tickets/my-complaints ─── User's own complaints
@@ -500,10 +516,10 @@ router.put('/master/:id', protect, authorize('officer', 'dept_head', 'junior', '
         const previousStatus = ticket.status;
 
         // Dynamic field updates
-        const allowedFields = ['status', 'assignedEngineerId', 'assignedJuniorId', 'needsManualGeo', 'resolutionRemarks', 'severity', 'complaintCount', 'department', 'landmark', 'city', 'progressPercent', 'zone', 'wardNumber', 'locality', 'pincode'];
+        const allowedFields = ['status', 'assignedEngineerId', 'assignedJuniorId', 'needsManualGeo', 'resolutionRemarks', 'severity', 'complaintCount', 'department', 'landmark', 'city', 'progressPercent', 'currentPhase', 'zone', 'wardNumber', 'locality', 'pincode'];
         allowedFields.forEach(field => {
             if (req.body[field] !== undefined) {
-                if (isJunior && !['progressPercent', 'resolutionRemarks'].includes(field)) return;
+                if (isJunior && !['progressPercent', 'currentPhase', 'resolutionRemarks', 'juniorRemarks'].includes(field)) return;
                 if ((field === 'assignedEngineerId' || field === 'assignedJuniorId') && !req.body[field]) {
                     ticket[field] = null;
                 } else {
@@ -519,6 +535,42 @@ router.put('/master/:id', protect, authorize('officer', 'dept_head', 'junior', '
             ticket.status = 'In_Progress';
         }
 
+        // Update phases when progress changes
+        if (req.body.progressPercent !== undefined) {
+            // Auto-calculate phase if not explicitly provided
+            const targetPhase = req.body.currentPhase || calculatePhase(req.body.progressPercent);
+            
+            if (ticket.phases && ticket.phases.length > 0) {
+                const phaseIndex = targetPhase - 1;
+                if (phaseIndex >= 0 && phaseIndex < ticket.phases.length) {
+                    ticket.phases[phaseIndex].status = 'completed';
+                    ticket.phases[phaseIndex].completedAt = new Date();
+                    ticket.phases[phaseIndex].updatedBy = req.user._id;
+                    
+                    // Mark next phase as in_progress
+                    if (phaseIndex + 1 < ticket.phases.length) {
+                        ticket.phases[phaseIndex + 1].status = 'in_progress';
+                        ticket.phases[phaseIndex + 1].startedAt = new Date();
+                    }
+                }
+                ticket.currentPhase = targetPhase;
+            }
+        } else if (req.body.currentPhase && ticket.phases) {
+            // Only currentPhase provided, update phases
+            const phaseIndex = req.body.currentPhase - 1;
+            if (phaseIndex >= 0 && phaseIndex < ticket.phases.length) {
+                ticket.phases[phaseIndex].status = 'completed';
+                ticket.phases[phaseIndex].completedAt = new Date();
+                ticket.phases[phaseIndex].updatedBy = req.user._id;
+                
+                if (phaseIndex + 1 < ticket.phases.length) {
+                    ticket.phases[phaseIndex + 1].status = 'in_progress';
+                    ticket.phases[phaseIndex + 1].startedAt = new Date();
+                }
+            }
+            ticket.currentPhase = req.body.currentPhase;
+        }
+
         // Manual coordinate fix from Officer/DeptHead
         if ((isOfficer || isDeptHead) && hasGeoCoordinates(req.body.lat, req.body.lng)) {
             ticket.location = { type: 'Point', coordinates: [Number(req.body.lng), Number(req.body.lat)] };
@@ -530,10 +582,9 @@ router.put('/master/:id', protect, authorize('officer', 'dept_head', 'junior', '
             await req.user.save();
         }
 
-        // Engineer resolution submission
+        // Engineer resolution submission (full completion)
         if (hasGeoCoordinates(req.body.resolutionLat, req.body.resolutionLng)) {
             ticket.resolutionLocation = { type: 'Point', coordinates: [Number(req.body.resolutionLng), Number(req.body.resolutionLat)] };
-            // Append resolution images to array
             if (req.body.resolutionImageUrl) {
                 ticket.resolutionImages.push(req.body.resolutionImageUrl);
             }
@@ -545,16 +596,23 @@ router.put('/master/:id', protect, authorize('officer', 'dept_head', 'junior', '
             ticket.status = 'Pending_Verification';
         }
 
+        // Progress update with photo (at ANY progress level, not just 100%)
+        const remarks = req.body.juniorRemarks || req.body.resolutionRemarks || req.body.resolutionNotes || req.body.remarks || '';
+        const progressImages = req.body.progressImage ? [req.body.progressImage] : [];
+
         // Push to actionHistory on every update
         ticket.actionHistory.push({
             updatedBy: req.user._id,
             previousStatus: previousStatus,
             newStatus: ticket.status,
-            remarks: req.body.resolutionRemarks || req.body.resolutionNotes || req.body.remarks || `Progress: ${ticket.progressPercent}%`,
+            remarks: remarks || `Progress: ${ticket.progressPercent}%`,
             progressPercentage: ticket.progressPercent,
-            images: req.body.resolutionImageUrl ? [req.body.resolutionImageUrl] :
-                (req.body.resolutionImages || [])
+            images: progressImages.length > 0 ? progressImages :
+                (req.body.resolutionImageUrl ? [req.body.resolutionImageUrl] : [])
         });
+
+        // Update last progress timestamp
+        ticket.lastProgressUpdate = new Date();
 
         await ticket.save();
         res.json(formatTicket(ticket));

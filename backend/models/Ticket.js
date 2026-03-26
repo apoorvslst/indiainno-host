@@ -17,7 +17,29 @@ const actionHistorySchema = new mongoose.Schema({
     images: [{ type: String }] // phase-by-phase images from engineer
 }, { _id: false });
 
-// 3. The Master Ticket Schema (MCD Specific)
+// 3. Phase Tracking Sub-schema (Amazon-like milestone tracking)
+const phaseSchema = new mongoose.Schema({
+    phase: { type: Number, enum: [1, 2, 3, 4, 5], required: true },
+    name: { type: String, required: true },
+    description: { type: String, default: '' },
+    status: { type: String, enum: ['pending', 'in_progress', 'completed'], default: 'pending' },
+    startedAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+    images: [{ type: String }],
+    remarks: { type: String, default: '' },
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+}, { _id: false });
+
+// Phase names based on category type
+const PHASE_NAMES = {
+    default: ['Inspection', 'Planning', 'Execution', 'Verification', 'Completion'],
+    road: ['Site Inspection', 'Traffic Planning', 'Repair Work', 'Quality Check', 'Road Open'],
+    water: ['Leak Detection', 'Material Planning', 'Pipe Repair', 'Pressure Test', 'Supply Restore'],
+    electrical: ['Safety Audit', 'Equipment Prep', 'Repair Work', 'Safety Verification', 'Power Restore'],
+    drainage: ['Blockage Assessment', 'Equipment Deployment', 'Cleaning Work', 'Sanitization', 'Completion'],
+};
+
+// 4. The Master Ticket Schema (MCD Specific)
 const masterTicketSchema = new mongoose.Schema({
     // Ticket Identification
     ticketNumber: { type: String, unique: true },
@@ -36,7 +58,7 @@ const masterTicketSchema = new mongoose.Schema({
     department: { type: String, default: null },
     severity: { type: String, enum: ['Low', 'Medium', 'High', 'Critical'], default: 'Low' },
     level: { type: Number, enum: [1, 2, 3, 4], default: 1 },
-    isApproved: { type: Boolean, default: null }, // null means pending, true means approved, false means rejected
+    isApproved: { type: Boolean, default: null },
     approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 
     // MCD Specific Location Hierarchy
@@ -69,6 +91,9 @@ const masterTicketSchema = new mongoose.Schema({
 
     // Progress Tracking
     progressPercent: { type: Number, default: 0, min: 0, max: 100 },
+    currentPhase: { type: Number, enum: [1, 2, 3, 4, 5], default: 1 },
+    phases: [phaseSchema],
+    lastProgressUpdate: { type: Date, default: null },
     actionHistory: [actionHistorySchema],
 
     // Resolution Evidence
@@ -91,10 +116,39 @@ const masterTicketSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-// Pre-save: auto-generate ticketNumber
+// Pre-save: auto-generate ticketNumber and initialize phases
 masterTicketSchema.pre('save', async function () {
     if (!this.ticketNumber) {
         this.ticketNumber = 'MCD-' + Math.floor(100000 + Math.random() * 900000);
+    }
+    
+    // Initialize phases if not set
+    if (!this.phases || this.phases.length === 0) {
+        const category = this.primaryCategory?.toLowerCase() || '';
+        let phaseNames = PHASE_NAMES.default;
+        
+        if (category.includes('road') || category.includes('pothole')) phaseNames = PHASE_NAMES.road;
+        else if (category.includes('water') || category.includes('drain')) phaseNames = PHASE_NAMES.water;
+        else if (category.includes('electric') || category.includes('power')) phaseNames = PHASE_NAMES.electrical;
+        else if (category.includes('drain') || category.includes('sewage')) phaseNames = PHASE_NAMES.drainage;
+        
+        this.phases = phaseNames.map((name, index) => ({
+            phase: index + 1,
+            name: name,
+            description: '',
+            status: index === 0 ? 'in_progress' : 'pending',
+            startedAt: index === 0 ? new Date() : null,
+            completedAt: null,
+            images: [],
+            remarks: '',
+            updatedBy: null
+        }));
+        this.currentPhase = 1;
+    }
+    
+    // Update lastProgressUpdate when progress changes
+    if (this.isModified('progressPercent') || this.isModified('actionHistory')) {
+        this.lastProgressUpdate = new Date();
     }
 });
 

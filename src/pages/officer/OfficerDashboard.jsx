@@ -12,6 +12,7 @@ export default function OfficerDashboard() {
     const [tickets, setTickets] = useState([]);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [currentTime] = useState(() => Date.now());
 
     const mode = userProfile?.mode || "urban";
     const roleTitle = getRoleTitle("officer", mode);
@@ -72,7 +73,7 @@ export default function OfficerDashboard() {
     const pendingBreakdown = (() => {
         const buckets = { "0-2 days": 0, "3-7 days": 0, "8-14 days": 0, "15-30 days": 0, "30+ days": 0 };
         activeTickets.forEach(t => {
-            const days = Math.floor((Date.now() - new Date(t.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+            const days = Math.floor((currentTime - new Date(t.createdAt).getTime()) / (1000 * 60 * 60 * 24));
             if (days <= 2) buckets["0-2 days"]++;
             else if (days <= 7) buckets["3-7 days"]++;
             else if (days <= 14) buckets["8-14 days"]++;
@@ -237,7 +238,7 @@ export default function OfficerDashboard() {
                                 {juniors.slice(0, 8).map(j => {
                                     const dept = DEPARTMENTS.find(d => d.id === j.department);
                                     const daysSinceActive = j.lastActiveDate
-                                        ? Math.floor((Date.now() - new Date(j.lastActiveDate).getTime()) / (1000 * 60 * 60 * 24))
+                                        ? Math.floor((currentTime - new Date(j.lastActiveDate).getTime()) / (1000 * 60 * 60 * 24))
                                         : "—";
                                     return (
                                         <div key={j._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #f1f5f9" }}>

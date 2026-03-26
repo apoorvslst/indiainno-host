@@ -18,6 +18,7 @@ export default function ManageDepartments() {
     const [selectedDeptId, setSelectedDeptId] = useState(DEPARTMENTS[0]?.id || "");
     const [deptStats, setDeptStats] = useState({});
     const [deptDetails, setDeptDetails] = useState({});
+    const [currentTime] = useState(() => Date.now());
 
     const getDelayMeta = (ticket) => {
         const createdAt = ticket?.createdAt ? new Date(ticket.createdAt) : null;
@@ -25,7 +26,7 @@ export default function ManageDepartments() {
             return { label: "--", slaLabel: "--", breached: false, hours: 0 };
         }
 
-        const elapsedMs = Date.now() - createdAt.getTime();
+        const elapsedMs = currentTime - createdAt.getTime();
         const hours = Math.max(0, Math.floor(elapsedMs / (1000 * 60 * 60)));
         const days = Math.floor(hours / 24);
         const remHours = hours % 24;

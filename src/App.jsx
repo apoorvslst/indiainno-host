@@ -17,6 +17,11 @@ import ResolveTicket from "./pages/engineer/ResolveTicket";
 
 // Dept Head
 import DeptHeadDashboard from "./pages/dept_head/DeptHeadDashboard";
+import PendingCases from "./pages/dept_head/PendingCases";
+import SLACares from "./pages/dept_head/SLACares";
+import MyJuniors from "./pages/dept_head/MyJuniors";
+import DeptHeadReports from "./pages/dept_head/Reports";
+import DeptHeadManualQueue from "./pages/dept_head/ManualQueue";
 
 // Officer (replaces admin)
 import OfficerDashboard from "./pages/officer/OfficerDashboard";
@@ -25,6 +30,7 @@ import ManageEngineers from "./pages/admin/ManageEngineers";
 import ManageDepartments from "./pages/admin/ManageDepartments";
 import MapView from "./pages/admin/MapView";
 import ManualQueue from "./pages/admin/ManualQueue";
+import OfficerReports from "./pages/officer/Reports";
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { user, userProfile, loading } = useAuth();
@@ -72,6 +78,11 @@ export default function App() {
 
       {/* Dept Head Routes */}
       <Route path="/dept-head" element={<ProtectedRoute allowedRoles={["dept_head"]}><DeptHeadDashboard /></ProtectedRoute>} />
+      <Route path="/dept-head/pending" element={<ProtectedRoute allowedRoles={["dept_head"]}><PendingCases /></ProtectedRoute>} />
+      <Route path="/dept-head/sla" element={<ProtectedRoute allowedRoles={["dept_head"]}><SLACares /></ProtectedRoute>} />
+      <Route path="/dept-head/juniors" element={<ProtectedRoute allowedRoles={["dept_head"]}><MyJuniors /></ProtectedRoute>} />
+      <Route path="/dept-head/reports" element={<ProtectedRoute allowedRoles={["dept_head"]}><DeptHeadReports /></ProtectedRoute>} />
+      <Route path="/dept-head/manual-queue" element={<ProtectedRoute allowedRoles={["dept_head"]}><DeptHeadManualQueue /></ProtectedRoute>} />
 
       {/* Officer Routes */}
       <Route path="/officer" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><OfficerDashboard /></ProtectedRoute>} />
@@ -80,6 +91,7 @@ export default function App() {
       <Route path="/officer/departments" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><ManageDepartments /></ProtectedRoute>} />
       <Route path="/officer/map" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><MapView /></ProtectedRoute>} />
       <Route path="/officer/manual-queue" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><ManualQueue /></ProtectedRoute>} />
+      <Route path="/officer/reports" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><OfficerReports /></ProtectedRoute>} />
 
       {/* Legacy Redirects */}
       <Route path="/admin" element={<Navigate to="/officer" />} />

@@ -4,7 +4,25 @@ import DashboardLayout from "../../components/DashboardLayout";
 import api from "../../utils/api";
 import { getCurrentLocation, isWithinRange } from "../../utils/geolocation";
 import toast from "react-hot-toast";
-import { HiOutlineLocationMarker, HiOutlinePhotograph, HiOutlineShieldCheck, HiOutlineCheckCircle } from "react-icons/hi";
+import { HiOutlineLocationMarker, HiOutlinePhotograph, HiOutlineShieldCheck, HiOutlineCheckCircle, HiOutlineClock } from "react-icons/hi";
+
+const PHASE_LABELS = ['Inspection', 'Planning', 'Execution', 'Verification', 'Completion'];
+
+const calculatePhase = (percent) => {
+    if (percent <= 20) return 1;
+    if (percent <= 40) return 2;
+    if (percent <= 60) return 3;
+    if (percent <= 80) return 4;
+    return 5;
+};
+
+const getPhaseInfo = (percent) => {
+    const phase = calculatePhase(percent);
+    return {
+        phase,
+        label: `Phase ${phase}: ${PHASE_LABELS[phase - 1]}`
+    };
+};
 
 export default function ResolveTicket() {
     const { ticketId } = useParams();
@@ -21,7 +39,8 @@ export default function ResolveTicket() {
         imageFile: null,
         imagePreview: null,
         notes: "",
-        progressPercent: 0
+        progressPercent: 0,
+        currentPhase: 1
     });
 
     useEffect(() => {
@@ -29,10 +48,14 @@ export default function ResolveTicket() {
             try {
                 const { data } = await api.get(`/tickets/master/${ticketId}`);
                 setTicket(data);
-                setForm(prev => ({ ...prev, progressPercent: data.progressPercent || 0 }));
+                setForm(prev => ({ 
+                    ...prev, 
+                    progressPercent: data.progressPercent || 0,
+                    currentPhase: data.currentPhase || 1
+                }));
             } catch {
                 toast.error("Failed to load ticket");
-                navigate("/engineer");
+                navigate("/junior");
             }
             setLoading(false);
         };
@@ -70,52 +93,53 @@ export default function ResolveTicket() {
         setGeoLoading(false);
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        // If not 100%, just update progress
-        if (form.progressPercent < 100) {
-            setSubmitting(true);
-            try {
-                await api.put(`/tickets/master/${ticketId}`, {
-                    progressPercent: form.progressPercent
-                });
-                toast.success("Progress updated successfully!");
-                navigate("/engineer");
-            } catch {
-                toast.error("Failed to update progress.");
-            }
-            setSubmitting(false);
-            return;
-        }
-
-        // Full resolution constraints
-        if (!form.lat || !form.lng) return toast.error("Live geolocation is strictly required to prove presence.");
-        if (!form.imagePreview) return toast.error("Must upload a live photo of the resolution.");
-
-        if (ticket.lat && ticket.lng) {
-            const check = isWithinRange(ticket.lat, ticket.lng, form.lat, form.lng, 50);
-            if (!check.withinRange) {
-                toast.error(`CRYPTOGRAPHIC DENIAL: Upload coordinates are ${check.distance}m away from the ticket coordinates.`);
-                return;
-            }
-        }
-
+    const handleProgressUpdate = async () => {
         setSubmitting(true);
         try {
-            await api.put(`/tickets/master/${ticketId}`, {
-                resolutionLat: form.lat,
-                resolutionLng: form.lng,
-                resolutionRemarks: form.notes,
-                resolutionImageUrl: form.imagePreview,
-                progressPercent: 100
-            });
+            const updateData = {
+                progressPercent: form.progressPercent,
+                currentPhase: form.currentPhase,
+                juniorRemarks: form.notes
+            };
+            
+            // Add image if provided (for any progress level)
+            if (form.imagePreview) {
+                updateData.progressImage = form.imagePreview;
+            }
+            
+            // Only require location for final completion (100%)
+            if (form.progressPercent === 100) {
+                if (!form.lat || !form.lng) {
+                    toast.error("Live geolocation required for final completion");
+                    setSubmitting(false);
+                    return;
+                }
+                updateData.resolutionLat = form.lat;
+                updateData.resolutionLng = form.lng;
+                updateData.resolutionRemarks = form.notes;
+                updateData.resolutionImageUrl = form.imagePreview;
+                
+                if (ticket.lat && ticket.lng) {
+                    const check = isWithinRange(ticket.lat, ticket.lng, form.lat, form.lng, 50);
+                    if (!check.withinRange) {
+                        toast.error(`Geo-fence failed: ${check.distance}m away from ticket location`);
+                        setSubmitting(false);
+                        return;
+                    }
+                }
+            }
 
-            toast.success("Resolution submitted successfully. Awaiting citizen verification.", { duration: 5000 });
-            navigate("/engineer");
+            await api.put(`/tickets/master/${ticketId}`, updateData);
+            
+            const message = form.progressPercent === 100 
+                ? "Resolution submitted successfully! Awaiting verification."
+                : `Progress updated to ${form.progressPercent}% (Phase ${form.currentPhase})`;
+            
+            toast.success(message);
+            navigate("/junior");
         } catch (err) {
             console.error(err);
-            toast.error("Failed to commit resolution block.");
+            toast.error("Failed to update progress");
         }
         setSubmitting(false);
     };
@@ -123,8 +147,12 @@ export default function ResolveTicket() {
     if (loading) return <DashboardLayout><div className="flex justify-center py-20"><div className="spinner" /></div></DashboardLayout>;
     if (!ticket) return null;
 
+    const getCurrentPhaseInfo = () => {
+        return getPhaseInfo(form.progressPercent);
+    };
+
     return (
-        <DashboardLayout title="Resolve Issue" subtitle={`${ticket.ticketNumber || ticket.id.slice(0, 8)}`}>
+        <DashboardLayout title="Resolve Issue" subtitle={`${ticket.ticketNumber || ticket.id?.slice(0, 8)}`}>
             <div className="grid md:grid-cols-2 gap-8">
                 <div className="space-y-6 animate-fadeInUp">
                     <div className="card">
@@ -136,116 +164,216 @@ export default function ResolveTicket() {
                             <span className={`badge severity-${(ticket.severity || "low").toLowerCase()}`}>{ticket.severity}</span>
                         </div>
 
+                        {/* Phase Progress Tracker */}
+                        <div className="mb-4 p-4 bg-[var(--color-surface)] rounded-xl">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium">Progress Timeline</span>
+                                <span className="text-xs text-[var(--color-text-muted)]">Current: Phase {form.currentPhase}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                {[1, 2, 3, 4, 5].map((phase) => (
+                                    <div key={phase} className="flex-1">
+                                        <div className={`h-2 rounded-full ${phase <= form.currentPhase ? 'bg-[var(--color-primary)]' : 'bg-gray-200'}`} />
+                                        <div className="text-[10px] text-center mt-1 text-[var(--color-text-muted)]">{PHASE_LABELS[phase-1]?.slice(0, 4)}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
                         <div className="p-4 bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] mb-4">
                             <p className="text-sm font-medium mb-1 flex items-center gap-2"><HiOutlineLocationMarker className="text-[var(--color-primary)]" /> Target Area</p>
                             <code className="text-xs text-[var(--color-text-muted)]">Lat: {ticket.lat?.toFixed(5)} | Lng: {ticket.lng?.toFixed(5)}</code>
                         </div>
 
-                        <div className="bg-[#ef4444]/10 border border-[#ef4444]/20 rounded-xl p-4 flex gap-3 text-sm">
-                            <HiOutlineShieldCheck className="text-2xl text-[#ef4444] shrink-0" />
-                            <div>
-                                <strong className="block text-[#ef4444] mb-1">Strict Geo-Fencing Active</strong>
-                                <p className="text-[#f87171]">You must be physically within exactly 50 meters of the target coordinates to submit this resolution. Submissions outside this radius are cryptographically rejected.</p>
-                            </div>
-                        </div>
-
-                                {(ticket.status === "Disputed" || ticket.status === "Reopened") && (ticket.reComplaintRemark || ticket.citizenFeedbackText) && (
-                                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3 text-sm mt-4">
-                                        <span className="text-2xl shrink-0">🔄</span>
-                                        <div>
-                                            <strong className="block text-red-600 mb-1">Citizen Re-complaint</strong>
-                                            <p className="text-red-800">{ticket.reComplaintRemark || ticket.citizenFeedbackText}</p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {ticket.actionHistory?.length > 0 && (
-                                    <div className="mt-4">
-                                        <h4 className="text-sm font-semibold mb-2">Timeline ({ticket.actionHistory.length} updates)</h4>
-                                        <div className="space-y-2 border-l-2 border-[var(--color-border)] pl-4 max-h-48 overflow-y-auto">
-                                            {ticket.actionHistory.map((entry, i) => (
-                                                <div key={i} className="relative text-xs">
-                                                    <div className="absolute -left-[21px] w-2.5 h-2.5 rounded-full bg-[var(--color-primary)] border-2 border-white" />
-                                                    <span className="font-semibold">{entry.newStatus?.replace(/_/g, ' ')}</span>
-                                                    {entry.progressPercentage !== undefined && <span className="ml-1 text-[var(--color-text-muted)]">{entry.progressPercentage}%</span>}
-                                                    <p className="text-[var(--color-text-muted)]">{entry.remarks}</p>
+                        {ticket.actionHistory?.length > 0 && (
+                            <div className="mt-4">
+                                <h4 className="text-sm font-semibold mb-2">Timeline ({ticket.actionHistory.length} updates)</h4>
+                                <div className="space-y-2 border-l-2 border-[var(--color-border)] pl-4 max-h-48 overflow-y-auto">
+                                    {ticket.actionHistory.map((entry, i) => (
+                                        <div key={i} className="relative text-xs">
+                                            <div className="absolute -left-[21px] w-2.5 h-2.5 rounded-full bg-[var(--color-primary)] border-2 border-white" />
+                                            <span className="font-semibold">{entry.newStatus?.replace(/_/g, ' ')}</span>
+                                            {entry.progressPercentage !== undefined && <span className="ml-1 text-[var(--color-text-muted)]">{entry.progressPercentage}%</span>}
+                                            <p className="text-[var(--color-text-muted)]">{entry.remarks}</p>
+                                            {entry.images?.length > 0 && (
+                                                <div className="flex gap-1 mt-1">
+                                                    {entry.images.map((img, idx) => (
+                                                        <img key={idx} src={img} alt="" className="w-8 h-8 rounded object-cover" />))}
                                                 </div>
-                                            ))}
+                                            )}
                                         </div>
-                                    </div>
-                                )}
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 <div className="animate-fadeInUp" style={{ animationDelay: "100ms" }}>
-                    <form onSubmit={handleSubmit} className="card space-y-6">
-                        <h3 className="text-lg font-bold">Cryptographic Proof of Work</h3>
+                    <div className="card space-y-6">
+                        <h3 className="text-lg font-bold">Update Progress</h3>
 
+                        {/* Progress Slider - Any percentage allowed */}
                         <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-                            <label className="block text-sm font-medium mb-3 text-[var(--color-text-muted)]">Current Progress: {form.progressPercent}%</label>
+                            <div className="flex justify-between items-center mb-3">
+                                <label className="text-sm font-medium">Progress: {form.progressPercent}%</label>
+                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                    {getCurrentPhaseInfo().label}
+                                </span>
+                            </div>
                             <input
-                                type="range" min="0" max="100" step="10"
+                                type="range" min="0" max="100" step="1"
                                 value={form.progressPercent}
-                                onChange={(e) => setForm({ ...form, progressPercent: parseInt(e.target.value) })}
+                                onChange={(e) => {
+                                    const pct = parseInt(e.target.value);
+                                    setForm({ 
+                                        ...form, 
+                                        progressPercent: pct,
+                                        currentPhase: calculatePhase(pct)
+                                    });
+                                }}
                                 className="w-full accent-[var(--color-primary)]"
                             />
+                            <div className="flex justify-between text-[10px] text-[var(--color-text-muted)] mt-2">
+                                <span>0%</span>
+                                <span>20%</span>
+                                <span>40%</span>
+                                <span>60%</span>
+                                <span>80%</span>
+                                <span>100%</span>
+                            </div>
+                            <div className="mt-3 flex items-center gap-2">
+                                <label className="text-xs text-[var(--color-text-muted)]">Or type %:</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    value={form.progressPercent}
+                                    onChange={(e) => {
+                                        const pct = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                                        setForm({ 
+                                            ...form, 
+                                            progressPercent: pct,
+                                            currentPhase: calculatePhase(pct)
+                                        });
+                                    }}
+                                    className="input-field"
+                                    style={{ width: '70px', padding: '4px 8px', fontSize: '12px' }}
+                                />
+                                <span className="text-xs text-[var(--color-text-muted)]">%</span>
+                            </div>
                             <p className="text-xs text-[var(--color-text-muted)] mt-2">
-                                If less than 100%, this will just update the progress for the citizen without requiring geo-proof or images.
+                                0-20% = Phase 1, 21-40% = Phase 2, 41-60% = Phase 3, 61-80% = Phase 4, 81-100% = Phase 5
                             </p>
                         </div>
 
-                        {form.progressPercent === 100 && (
-                            <div className="space-y-4">
-                                <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-                                    <label className="block text-sm font-medium mb-3 text-[var(--color-text-muted)]">Step 1: Verify Location Identity</label>
+                        {/* Phase Selection */}
+                        <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+                            <label className="text-sm font-medium mb-3 block">Current Phase</label>
+                            <div className="flex gap-2">
+                                {[1, 2, 3, 4, 5].map((phase) => (
                                     <button
+                                        key={phase}
                                         type="button"
-                                        onClick={captureLocation}
-                                        disabled={geoLoading}
-                                        className={`btn-secondary w-full justify-center py-3 ${form.lat ? 'border-[#22c55e] bg-[#22c55e]/10 text-[#4ade80]' : ''}`}
+                                        onClick={() => {
+                                            const pct = phase * 20;
+                                            setForm({ ...form, currentPhase: phase, progressPercent: pct });
+                                        }}
+                                        className={`flex-1 py-2 px-1 text-xs rounded-lg border ${
+                                            form.currentPhase === phase 
+                                                ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]' 
+                                                : 'border-gray-200 hover:border-[var(--color-primary)]'
+                                        }`}
                                     >
-                                        {geoLoading ? (
-                                            <><div className="spinner w-4 h-4 border-2" /> Polling Satellites...</>
-                                        ) : form.lat ? (
-                                            <><HiOutlineCheckCircle className="text-lg" /> Coordinates Locked ({Math.round(form.accuracy)}m acc)</>
-                                        ) : (
-                                            <><HiOutlineLocationMarker className="text-lg" /> Fetch Live GPS Sig</>
-                                        )}
+                                        P{phase}
                                     </button>
-                                </div>
+                                ))}
+                            </div>
+                        </div>
 
-                                <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-                                    <label className="block text-sm font-medium mb-3 text-[var(--color-text-muted)]">Step 2: Live Camera Proof</label>
-                                    <label className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors ${form.imagePreview ? 'border-[var(--color-primary)]' : 'border-[var(--color-border)] hover:border-[var(--color-primary)]'}`}>
-                                        {form.imagePreview ? (
-                                            <img src={form.imagePreview} alt="Resolution proof" className="max-h-48 rounded-lg mb-0" />
-                                        ) : (
-                                            <>
-                                                <div className="w-12 h-12 rounded-full bg-[var(--color-card)] flex items-center justify-center mb-3 shadow-lg">
-                                                    <HiOutlinePhotograph className="text-2xl text-[var(--color-primary)]" />
-                                                </div>
-                                                <p className="text-sm font-medium">Open Camera</p>
-                                            </>
-                                        )}
-                                        <input type="file" accept="image/*" capture="environment" onChange={handleImageChange} className="hidden" />
-                                    </label>
-                                </div>
+                        {/* Photo Upload - Available at ALL progress levels */}
+                        <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+                            <label className="text-sm font-medium mb-3 block flex items-center gap-2">
+                                <HiOutlinePhotograph /> 
+                                {form.progressPercent === 100 ? 'Final Resolution Photo' : 'Progress Photo (Optional)'}
+                            </label>
+                            <label className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-4 cursor-pointer transition-colors ${
+                                form.imagePreview ? 'border-[var(--color-primary)]' : 'border-[var(--color-border)] hover:border-[var(--color-primary)]'
+                            }`}>
+                                {form.imagePreview ? (
+                                    <>
+                                        <img src={form.imagePreview} alt="Progress" className="max-h-32 rounded-lg mb-2" />
+                                        <span className="text-xs text-[var(--color-text-muted)]">Click to change</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="w-10 h-10 rounded-full bg-[var(--color-card)] flex items-center justify-center mb-2">
+                                            <HiOutlinePhotograph className="text-xl text-[var(--color-primary)]" />
+                                        </div>
+                                        <p className="text-sm font-medium">Add Photo</p>
+                                    </>
+                                )}
+                                <input type="file" accept="image/*" capture="environment" onChange={handleImageChange} className="hidden" />
+                            </label>
+                        </div>
 
-                                <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-                                    <label className="block text-sm font-medium mb-2 text-[var(--color-text-muted)]">Engineer Remarks (Optional)</label>
-                                    <textarea
-                                        value={form.notes}
-                                        onChange={e => setForm({ ...form, notes: e.target.value })}
-                                        className="input-field min-h-[80px]"
-                                    />
-                                </div>
+                        {/* Location - Only required for 100% */}
+                        {form.progressPercent === 100 && (
+                            <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+                                <label className="text-sm font-medium mb-3 block">Verify Location (Required for completion)</label>
+                                <button
+                                    type="button"
+                                    onClick={captureLocation}
+                                    disabled={geoLoading}
+                                    className={`btn-secondary w-full justify-center py-3 ${form.lat ? 'border-green-500 bg-green-50 text-green-700' : ''}`}
+                                >
+                                    {geoLoading ? (
+                                        <><div className="spinner w-4 h-4" /> Locating...</>
+                                    ) : form.lat ? (
+                                        <><HiOutlineCheckCircle /> {Math.round(form.accuracy)}m accuracy</>
+                                    ) : (
+                                        <><HiOutlineLocationMarker /> Get Location</>
+                                    )}
+                                </button>
                             </div>
                         )}
 
-                        <button type="submit" className="btn-primary w-full justify-center py-4 text-base" disabled={submitting}>
-                            {submitting ? <div className="spinner w-5 h-5 border-2" /> : (form.progressPercent === 100 ? "Commit Final Resolution Block" : "Update Progress")}
+                        {/* Remarks - Available at ALL progress levels */}
+                        <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+                            <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                                <HiOutlineClock /> 
+                                {form.progressPercent === 100 ? 'Final Remarks' : 'Progress Remarks'}
+                            </label>
+                            <textarea
+                                value={form.notes}
+                                onChange={e => setForm({ ...form, notes: e.target.value })}
+                                className="input-field min-h-[80px]"
+                                placeholder={form.progressPercent === 100 
+                                    ? "Describe the work done..." 
+                                    : "What progress was made? Any challenges?"
+                                }
+                            />
+                        </div>
+
+                        <button 
+                            onClick={handleProgressUpdate}
+                            disabled={submitting}
+                            className="btn-primary w-full justify-center py-4 text-base"
+                        >
+                            {submitting ? (
+                                <div className="spinner w-5 h-5" />
+                            ) : form.progressPercent === 100 ? (
+                                "Complete & Submit Resolution"
+                            ) : (
+                                `Update Progress to ${form.progressPercent}%`
+                            )}
                         </button>
-                    </form>
+
+                        <p className="text-xs text-[var(--color-text-muted)] text-center">
+                            You can add photos and remarks at any progress level. 
+                            Final completion requires location verification.
+                        </p>
+                    </div>
                 </div>
             </div>
         </DashboardLayout>

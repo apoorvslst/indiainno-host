@@ -23,11 +23,16 @@ const userSchema = new mongoose.Schema({
     village: { type: String, default: '' },
 
     // Performance & accountability
-    performancePoints: { type: Number, default: 100, min: 0, max: 100 },
-    lastActiveDate: { type: Date, default: Date.now },
-    trustScore: { type: Number, default: 100, min: 0, max: 100 },
+  performancePoints: { type: Number, default: 100, min: 0, max: 100 },
+  lastActiveDate: { type: Date, default: Date.now },
+  trustScore: { type: Number, default: 100, min: 0, max: 100 },
+  
+  isBanned: { type: Boolean, default: false },
+  banReason: { type: String, default: '' },
+  bannedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  bannedAt: { type: Date, default: null },
 
-    active: { type: Boolean, default: true }
+  active: { type: Boolean, default: true }
 }, { timestamps: true });
 
 // Hash PIN before saving (same logic as password)

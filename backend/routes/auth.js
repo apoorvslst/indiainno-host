@@ -41,12 +41,16 @@ function buildUserResponse(user) {
 // @route   POST /api/auth/register
 // @desc    Register a new user (phone + PIN)
 router.post('/register', async (req, res) => {
-    try {
-        const { name, phone, pin, email, role, department, city, mode, district, block, village } = req.body;
+  console.log('[REGISTER] Body received:', JSON.stringify(req.body));
+  try {
+    const { name, phone, pin, email, role, department, city, mode, district, block, village } = req.body;
+    
+    console.log('[REGISTER] name:', name, 'phone:', phone, 'pin:', pin ? 'provided' : 'missing');
 
-        if (!name || !phone || !pin) {
-            return res.status(400).json({ message: 'Please provide name, phone number, and PIN' });
-        }
+    if (!name || !phone || !pin) {
+      console.log('[REGISTER] Validation failed - name:', !!name, 'phone:', !!phone, 'pin:', !!pin);
+      return res.status(400).json({ message: 'Please provide name, phone number, and PIN' });
+    }
 
         if (pin.length < 4) {
             return res.status(400).json({ message: 'PIN must be at least 4 digits' });
