@@ -29,6 +29,7 @@ import ManageTickets from "./pages/admin/ManageTickets";
 import ManageEngineers from "./pages/admin/ManageEngineers";
 import ManageDepartments from "./pages/admin/ManageDepartments";
 import MapView from "./pages/admin/MapView";
+import HeatmapView from "./pages/admin/HeatmapView";
 import ManualQueue from "./pages/admin/ManualQueue";
 import OfficerReports from "./pages/officer/Reports";
 
@@ -90,6 +91,7 @@ export default function App() {
       <Route path="/officer/engineers" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><ManageEngineers /></ProtectedRoute>} />
       <Route path="/officer/departments" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><ManageDepartments /></ProtectedRoute>} />
       <Route path="/officer/map" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><MapView /></ProtectedRoute>} />
+      <Route path="/officer/heatmap" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><HeatmapView /></ProtectedRoute>} />
       <Route path="/officer/manual-queue" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><ManualQueue /></ProtectedRoute>} />
       <Route path="/officer/reports" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><OfficerReports /></ProtectedRoute>} />
 
