@@ -1,0 +1,209 @@
+MUNICIPAL ENGINEERING STANDARD OPERATING PROCEDURE
+Water Distribution and Sewerage — Emergency Response
+Water Main Break and Pipe Burst Response Plan
+Document: MCD-SOP-WATER-003 | Version 1.8 | January 2024
+Issuing Authority: Delhi Jal Board / Urban Local Body Engineering Division
+
+================================================================
+SECTION 1 — SCOPE AND APPLICABILITY
+================================================================
+This SOP covers emergency response procedures for:
+- Water main breaks (distribution mains, trunk mains)
+- Service line bursts
+- Sewer line collapses and overflows
+- Hydrant failures and road flooding from water infrastructure
+
+Applicable Standards:
+- CPHEEO Manual on Water Supply and Treatment (Third Edition)
+- IS:12288 — Code of Practice for Water Supply
+- IS:4127 — Laying and Jointing of Stoneware Pipes
+- National Disaster Management Guidelines (Urban Flooding)
+
+================================================================
+SECTION 2 — IMMEDIATE RESPONSE (FIRST 2 HOURS)
+================================================================
+2.1 Alert and Notification Protocol
+Upon receiving water main break report:
+- JE/AE on duty notified within 15 minutes
+- Isolation valve location confirmed from GIS/asset map within 30 minutes
+- Traffic police informed for road closure coordination
+- Utility corridor notification: electricity, gas, telecom (call 1912 / IGN)
+
+2.2 Isolation Procedure
+Step 1: Identify isolation valve(s) from pipe network schematic
+Step 2: Two-person team at each valve — never operate alone
+Step 3: Close valves slowly (max. 1 revolution per 5 seconds) to prevent water hammer
+Step 4: Confirm isolation — flow at break location should reduce significantly
+Step 5: Note all consumers/areas affected by isolation
+Step 6: Activate alternative supply (tanker deployment) for affected consumers
+
+2.3 Immediate Safety Measures
+- Establish 15m exclusion zone around break point (increase to 30m if flooding)
+- Install pumps to remove standing water from carriageway within 30 minutes
+- Check for undermining of road structure — probe 1m around break
+- Isolate electricity supply to any surface/basement services in flood zone
+- Contact gas utility if gas mains are in proximity of break
+
+2.4 Evacuation Criteria
+Forced evacuation required if:
+- Water pressure exceeds 2.5 bar at break (main >300mm diameter)
+- Pavement collapse deeper than 500mm
+- Flooding encroaches on residential ground floors
+- Gas leak detected in conjunction with break
+
+================================================================
+SECTION 3 — SAFETY REQUIREMENTS
+================================================================
+3.1 PPE — Mandatory for all water main repair crew
+- Waterproof overalls/waders for workers in flooded areas
+- High-visibility vest (reflective)
+- Hard hat with chin strap (in confined space operations)
+- Safety boots (waterproof, steel-toe)
+- Nitrile gloves (water contact) + leather work gloves (excavation)
+- Eye protection during pipe cutting/joining
+- Confined space equipment if working below 1.2m depth (respiratory protection, harness, tripod)
+
+3.2 Confined Space Entry (excavations > 1.2m)
+Mandatory requirements per IS:4912:
+- Atmospheric testing (oxygen, combustible gas, H2S) before entry
+- Mechanical ventilation — continuous forced fresh air
+- Rescue/standby team at surface level at all times
+- Communication maintained between entrant and standby
+- Emergency extraction plan in place
+
+3.3 Traffic Management
+Water main repairs typically require full road closure on carriageway.
+Setup per IRC:67 and Street Works:
+- Temporary traffic signals or one-lane working
+- Advance warning 100m minimum
+- Diversionary route signed and lit
+- Night-time working: additional lighting (2 lux minimum on carriageway)
+
+================================================================
+SECTION 4 — EXCAVATION AND PIPE ACCESS
+================================================================
+4.1 Excavation Safety
+Maximum unsupported excavation: 1.2m deep (IS:3764)
+Shoring required: all excavations > 1.2m OR in loose/made ground
+Options: hydraulic shoring, sheet piling, trench boxes
+Slope excavation: 45° maximum in stable ground, 30° in soft soil
+
+4.2 Pipe Exposure Protocol
+Step 1: Hand dig 500mm around pipe location before mechanical excavation
+Step 2: Expose pipe for minimum 600mm on each side of break
+Step 3: Pump all water from excavation — zero standing water during repair
+Step 4: Clean pipe surface thoroughly — remove all soil, corrosion, debris
+Step 5: Mark pipe material and diameter on work order form
+
+4.3 Pipe Identification
+Common pipe materials in Indian municipal networks:
+- Cast Iron (CI): Pre-1980 installations, grey colour, heavy
+- Ductile Iron (DI): Post-1985, black epoxy coated
+- Asbestos Cement (AC): 1960–1990, treat as hazardous material
+- HDPE/PVC: Modern installations, plastic
+Note: AC pipe must be handled per Asbestos Safety Guidelines — wet before handling,
+double-bag for disposal, do not cut without respiratory protection.
+
+================================================================
+SECTION 5 — PIPE REPAIR PROCEDURES
+================================================================
+5.1 Temporary Repair (for immediate service restoration)
+Materials: Pipe repair clamp (saddle clamp), stainless steel bands
+Procedure:
+Step 1: Select clamp sized to pipe OD ± 5mm
+Step 2: Position clamp centrally over break/crack
+Step 3: Tighten bands evenly to 50 Nm torque
+Step 4: Slowly restore water supply — test at 1.1× working pressure
+Step 5: Monitor for 30 minutes before leaving site
+Expected life: 6–12 months (must be followed by permanent pipe replacement)
+
+5.2 Pipe Section Replacement (Permanent Repair)
+5.2.1 CI/DI Pipe (flanged or mechanical couplings)
+Step 1: Cut out damaged section using angle grinder or pipe cutter
+Step 2: Cut replacement section to exact length (allow 5mm tolerance)
+Step 3: Clean pipe ends and coupling seating faces
+Step 4: Install rubber gaskets in correct position
+Step 5: Assemble coupling/flanged joint — tighten bolts in diagonal pattern
+Step 6: Torque bolts to manufacturer specification (typically 40–80 Nm for DN100–300)
+
+5.2.2 HDPE Pipe (butt fusion or electrofusion)
+Step 1: Cut pipe with pipe cutter — ends must be square (< 0.5° out of square)
+Step 2: Scrape oxide layer from pipe ends (minimum 25mm from end)
+Step 3: Butt fusion: heat plate 200°C ± 10°C, join per ISO 21307
+Step 4: Allow cooling period — minimum 30 minutes before pressurising
+Step 5: Visual inspection of bead profile (uniform, no voids)
+
+5.3 Pressure Testing (Mandatory before backfill)
+Hydrostatic test per IS:2065:
+- Test pressure: 1.5× maximum working pressure for 1 hour
+- Allowable leakage: zero (zero tolerance for potable water mains)
+- Record gauge readings every 15 minutes
+- STOP test immediately if gauge drops — locate additional leak
+
+================================================================
+SECTION 6 — BACKFILL AND REINSTATEMENT
+================================================================
+6.1 Backfill Material and Compaction
+Layer 1 (pipe bedding, 150mm each side): Selected granular material, pea gravel
+Layer 2 (surround, up to 300mm above pipe): Selected soil, no stones > 25mm
+Compact layer 2 in 150mm lifts to 95% Proctor
+Layer 3 (sub-base): Granular sub-base per MoRTH Table 400-1, compact to 98%
+Layer 4 (surface reinstatement): Per Road Repair SOP MCD-SOP-ROAD-001
+
+6.2 Surface Reinstatement
+Temporary reinstatement: Cold mix asphalt (open to traffic within 4 hours)
+Permanent reinstatement: Hot mix within 28 days per Street Works Code
+
+================================================================
+SECTION 7 — CREW COMPOSITION
+================================================================
+Emergency water main repair crew (minimum):
+- 1 × Assistant Engineer (AE) — Site Supervisor
+- 1 × Foreman — direct crew supervision
+- 2 × Plumbers (licensed)
+- 4 × Labourers (excavation, backfill)
+- 1 × Machine operator (if mini-excavator used)
+- 1 × Traffic marshal
+
+================================================================
+SECTION 8 — EQUIPMENT
+================================================================
+Standard emergency response equipment:
+- Mini-excavator (1.5–3 tonne class)
+- Submersible dewatering pump (80–100mm outlet, minimum 500 L/min)
+- Pipe cutter / angle grinder
+- Hydraulic trench shoring or trench box
+- Pipe repair clamps (various sizes: DN100, DN150, DN200, DN250, DN300)
+- Welding/fusion equipment (for HDPE repairs)
+- Hydrostatic test pump and pressure gauge
+- Traffic management signs and barriers
+- Generator and lighting for night work
+- Emergency water tankers (coordinate with supply control room)
+
+================================================================
+SECTION 9 — COST ESTIMATION (2024 RATES)
+================================================================
+Emergency call-out: INR 12,000 – 18,000 (mobilisation)
+Excavation (per m³): INR 800 – 1,500
+Shoring (per day): INR 8,000 – 15,000
+Pipe repair clamp (DN150): INR 4,500 – 8,000
+Pipe section replacement (per metre, DI): INR 6,000 – 12,000
+Pipe section replacement (per metre, HDPE): INR 3,500 – 7,000
+Dewatering pump hire (per day): INR 3,000 – 5,000
+Road reinstatement: as per road SOP rates
+Typical total (small break, DN150 DI): INR 1,50,000 – 3,50,000
+Typical total (large break, DN300+ trunk): INR 5,00,000 – 20,00,000
+
+================================================================
+SECTION 10 — DOCUMENTATION
+================================================================
+Forms required:
+- Form DJB-EM-01: Emergency Work Order
+- Form DJB-PI-04: Pipe Identification and Condition Record
+- Form DJB-PT-02: Pressure Test Certificate
+- Form DJB-WC-05: Work Completion Certificate
+Consumer notification records retained 5 years.
+
+================================================================
+END OF SOP MCD-SOP-WATER-003
+================================================================

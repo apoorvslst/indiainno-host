@@ -222,23 +222,12 @@ router.get('/pending/all', protect, authorize('junior', 'engineer', 'senior_engi
 
     let query = { isActive: true };
 
-    if (['junior', 'engineer'].includes(userRole)) {
-      query.$or = [
-        { currentStage: 'ai_generated' },
-        { currentStage: 'pending_junior_review' },
-        { currentStage: 'approved' },
-        { currentStage: 'in_progress' }
-      ];
-      if (userDept) query.department = userDept;
-    } else if (userRole === 'senior_engineer') {
-      query.$or = [
-        { currentStage: 'pending_senior_review' },
-        { currentStage: 'approved' },
-        { currentStage: 'in_progress' }
-      ];
-      if (userDept) query.department = userDept;
-    } else if (userRole === 'dept_head') {
-      if (userDept) query.department = userDept;
+    // Officers and admins can see all plans across departments
+    if (!['officer', 'admin'].includes(userRole)) {
+      // For dept_head, senior_engineer, junior, engineer - show only their department
+      if (userDept) {
+        query.department = userDept;
+      }
     }
 
     const plans = await ImplementationPlan.find(query)
@@ -965,5 +954,247 @@ async function hasRelatedComplaint(userId, masterTicketId) {
   });
   return !!complaint;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ROUTE: POST /api/implementation-plans/generate-all
+// Generate implementation plans for all tickets that don't have one
+// ═══════════════════════════════════════════════════════════════════════════
+router.post('/generate-all', protect, authorize('admin', 'officer'), async (req, res) => {
+  try {
+    const { MasterTicket } = require('../models/Ticket');
+    const { getPlanTemplate } = require('../data/implementationPlans');
+    
+    const ticketsWithoutPlans = await MasterTicket.find({
+      implementationPlanId: { $exists: false }
+    }).limit(100);
+
+    let created = 0;
+    let skipped = 0;
+
+    for (const ticket of ticketsWithoutPlans) {
+      const existingPlan = await ImplementationPlan.findOne({ masterTicketId: ticket._id });
+      if (existingPlan) {
+        skipped++;
+        continue;
+      }
+
+      const template = getPlanTemplate(ticket.primaryCategory);
+      const steps = template.steps.map(step => ({
+        ...step,
+        status: 'pending',
+        beforePhotos: [],
+        duringPhotos: [],
+        afterPhotos: [],
+        juniorRemarks: '',
+        seniorRemarks: ''
+      }));
+
+      const materials = template.materials || [];
+      const totalCost = materials.reduce((sum, m) => sum + (m.estimatedCost || 0), 0);
+
+      const plan = new ImplementationPlan({
+        masterTicketId: ticket._id,
+        ticketNumber: ticket.ticketNumber,
+        category: ticket.primaryCategory,
+        subCategory: ticket.subCategory || '',
+        level: ticket.level || 1,
+        severity: ticket.severity || 'Low',
+        department: ticket.department || 'municipal',
+        zone: ticket.zone || '',
+        wardNumber: ticket.wardNumber || '',
+        locality: ticket.locality || '',
+        landmark: ticket.landmark || '',
+        title: template.title,
+        description: template.description,
+        problemAnalysis: template.problemAnalysis,
+        steps: steps,
+        totalEstimatedHours: template.estimatedHours,
+        totalEstimatedCost: totalCost,
+        primaryMaterials: materials,
+        primaryEquipment: template.equipment || [],
+        currentStage: 'ai_generated',
+        status: 'draft',
+        aiGeneratedAt: new Date(),
+        aiGeneratedBy: 'CivicSync AI',
+        approvalHistory: [{
+          action: 'ai_generated',
+          performedBy: null,
+          performedByRole: 'ai',
+          remarks: `AI-generated implementation plan for ${ticket.primaryCategory} complaint (Level ${ticket.level})`,
+          timestamp: new Date()
+        }]
+      });
+
+      await plan.save();
+      ticket.implementationPlanId = plan._id;
+      await ticket.save();
+      created++;
+    }
+
+    res.json({
+      message: `Generated ${created} new implementation plans`,
+      created,
+      skipped,
+      totalProcessed: ticketsWithoutPlans.length
+    });
+
+  } catch (err) {
+    console.error('[Generate All Plans Error]', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ROUTE: GET /api/implementation-plans/id/:planId
+// Get implementation plan by its ID
+// ═══════════════════════════════════════════════════════════════════════════
+router.get('/id/:planId', protect, async (req, res) => {
+  try {
+    const { planId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(planId)) {
+      return res.status(400).json({ message: 'Invalid plan ID' });
+    }
+
+    const plan = await ImplementationPlan.findById(planId)
+      .populate('juniorReviewedBy', 'name email department phone')
+      .populate('seniorReviewedBy', 'name email department phone')
+      .populate('approvedBy', 'name email department phone')
+      .populate('comments.author', 'name role department')
+      .populate('approvalHistory.performedBy', 'name role')
+      .populate('masterTicketId', 'ticketNumber primaryCategory severity status location description');
+
+    if (!plan) {
+      return res.status(404).json({ message: 'Implementation plan not found' });
+    }
+
+    const canView = 
+      req.user.role === 'admin' ||
+      req.user.role === 'officer' ||
+      req.user.role === 'dept_head' ||
+      ['junior', 'engineer', 'senior_engineer'].includes(req.user.role) ||
+      plan.isVisibleToCitizens;
+
+    if (!canView) {
+      return res.status(403).json({ 
+        message: 'You do not have permission to view this plan',
+        status: plan.currentStage
+      });
+    }
+
+    res.json(plan);
+
+  } catch (err) {
+    console.error('[ImplementationPlan Get By ID Error]', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ROUTE: GET /api/implementation-plans/sop-status
+// Check SOP service health and vector store status
+// ═══════════════════════════════════════════════════════════════════════════
+router.get('/sop-status', protect, async (req, res) => {
+  try {
+    const { checkSOPServiceHealth, checkVectorStoreStatus } = require('../services/sopPlanGenerator');
+    
+    const [sopHealth, vectorStore] = await Promise.all([
+      checkSOPServiceHealth(),
+      checkVectorStoreStatus()
+    ]);
+    
+    res.json({
+      sopService: sopHealth,
+      vectorStore: vectorStore,
+      timestamp: new Date()
+    });
+    
+  } catch (err) {
+    console.error('[SOP Status Error]', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ROUTE: POST /api/implementation-plans/regenerate/:ticketId
+// Regenerate implementation plan using SOP engine
+// ═══════════════════════════════════════════════════════════════════════════
+router.post('/regenerate/:ticketId', protect, authorize('junior', 'engineer', 'senior_engineer', 'dept_head', 'officer', 'admin'), async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(ticketId)) {
+      return res.status(400).json({ message: 'Invalid ticket ID' });
+    }
+    
+    const ticket = await MasterTicket.findById(ticketId);
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+    
+    const { generatePlanFromSOP, checkSOPServiceHealth } = require('../services/sopPlanGenerator');
+    
+    // Check if SOP service is available
+    const sopHealth = await checkSOPServiceHealth();
+    if (!sopHealth.running) {
+      return res.status(503).json({ 
+        message: 'SOP service is not running. Please start backend_portable server.',
+        error: sopHealth.error
+      });
+    }
+    
+    console.log(`[Regenerate] Generating SOP plan for ticket ${ticket.ticketNumber}`);
+    
+    const result = await generatePlanFromSOP(ticket);
+    
+    if (!result.success) {
+      return res.status(500).json({ 
+        message: 'Failed to generate plan',
+        error: result.error
+      });
+    }
+    
+    // Update existing plan or create new one
+    let existingPlan = await ImplementationPlan.findOne({ masterTicketId: ticketId });
+    
+    if (existingPlan) {
+      // Update existing plan with new SOP data
+      Object.assign(existingPlan, result.plan);
+      existingPlan.aiGeneratedAt = new Date();
+      existingPlan.aiGeneratedBy = 'CivicSync AI (SOP Regenerated)';
+      existingPlan.approvalHistory.push({
+        action: 'ai_generated',
+        performedBy: req.user._id,
+        performedByRole: req.user.role,
+        remarks: `Plan regenerated using SOP engine`,
+        timestamp: new Date()
+      });
+      await existingPlan.save();
+      
+      res.json({
+        message: 'Implementation plan regenerated successfully',
+        plan: existingPlan,
+        processingTime: result.processingTime
+      });
+    } else {
+      // Create new plan
+      const plan = new ImplementationPlan(result.plan);
+      await plan.save();
+      
+      ticket.implementationPlanId = plan._id;
+      await ticket.save();
+      
+      res.json({
+        message: 'Implementation plan created successfully',
+        plan: plan,
+        processingTime: result.processingTime
+      });
+    }
+    
+  } catch (err) {
+    console.error('[Regenerate Plan Error]', err);
+    res.status(500).json({ message: err.message });
+  }
+});
 
 module.exports = router;

@@ -19,12 +19,15 @@ const NAV_LINKS = {
   ],
   junior: [
     { to: "/junior", label: "Dashboard", icon: "📊" },
+    { to: "/junior/plans", label: "Implementation Plans", icon: "📋" },
   ],
   engineer: [
     { to: "/junior", label: "Dashboard", icon: "📊" },
+    { to: "/junior/plans", label: "Implementation Plans", icon: "📋" },
   ],
   dept_head: [
     { to: "/dept-head", label: "Dashboard", icon: "📊" },
+    { to: "/dept-head/plans", label: "Implementation Plans", icon: "📋" },
     { to: "/dept-head/pending", label: "Pending Cases", icon: "⏳" },
     { to: "/dept-head/sla", label: "SLA Cares", icon: "⚠️" },
     { to: "/dept-head/juniors", label: "My Juniors", icon: "👷" },
@@ -34,6 +37,7 @@ const NAV_LINKS = {
   officer: [
     { to: "/officer", label: "Dashboard", icon: "📊" },
     { to: "/officer/tickets", label: "Tickets", icon: "🎫" },
+    { to: "/officer/plans", label: "Implementation Plans", icon: "📋" },
     { to: "/officer/map", label: "Live Map", icon: "🗺️" },
     { to: "/officer/heatmap", label: "Heatmap", icon: "🔥" },
     { to: "/officer/engineers", label: "Officials", icon: "👷" },
@@ -44,6 +48,7 @@ const NAV_LINKS = {
   admin: [
     { to: "/officer", label: "Dashboard", icon: "📊" },
     { to: "/officer/tickets", label: "Tickets", icon: "🎫" },
+    { to: "/officer/plans", label: "Implementation Plans", icon: "📋" },
     { to: "/officer/map", label: "Live Map", icon: "🗺️" },
     { to: "/officer/heatmap", label: "Heatmap", icon: "🔥" },
     { to: "/officer/engineers", label: "Officials", icon: "👷" },

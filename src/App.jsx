@@ -33,6 +33,11 @@ import HeatmapView from "./pages/admin/HeatmapView";
 import ManualQueue from "./pages/admin/ManualQueue";
 import OfficerReports from "./pages/officer/Reports";
 
+// Implementation Plan Pages
+import ImplementationPlanSheet from "./pages/implementationPlan/ImplementationPlanSheet";
+import ProgressSummaryReport from "./pages/implementationPlan/ProgressSummaryReport";
+import ImplementationPlansList from "./pages/implementationPlan/ImplementationPlansList";
+
 function ProtectedRoute({ children, allowedRoles }) {
   const { user, userProfile, loading } = useAuth();
   if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="spinner" /></div>;
@@ -72,10 +77,15 @@ export default function App() {
       <Route path="/citizen/submit" element={<ProtectedRoute allowedRoles={["citizen", "user"]}><SubmitComplaint /></ProtectedRoute>} />
       <Route path="/citizen/complaints" element={<ProtectedRoute allowedRoles={["citizen", "user"]}><MyComplaints /></ProtectedRoute>} />
       <Route path="/citizen/map" element={<ProtectedRoute allowedRoles={["citizen", "user"]}><CityMap /></ProtectedRoute>} />
+      <Route path="/citizen/plan/:ticketId" element={<ProtectedRoute allowedRoles={["citizen", "user"]}><ImplementationPlanSheet /></ProtectedRoute>} />
+      <Route path="/citizen/progress/:planId" element={<ProtectedRoute allowedRoles={["citizen", "user"]}><ProgressSummaryReport /></ProtectedRoute>} />
 
       {/* Junior Routes */}
       <Route path="/junior" element={<ProtectedRoute allowedRoles={["junior", "engineer"]}><JuniorDashboard /></ProtectedRoute>} />
       <Route path="/junior/resolve/:ticketId" element={<ProtectedRoute allowedRoles={["junior", "engineer"]}><ResolveTicket /></ProtectedRoute>} />
+      <Route path="/junior/plans" element={<ProtectedRoute allowedRoles={["junior", "engineer"]}><ImplementationPlansList /></ProtectedRoute>} />
+      <Route path="/junior/plan/:ticketId" element={<ProtectedRoute allowedRoles={["junior", "engineer"]}><ImplementationPlanSheet /></ProtectedRoute>} />
+      <Route path="/junior/progress/:planId" element={<ProtectedRoute allowedRoles={["junior", "engineer"]}><ProgressSummaryReport /></ProtectedRoute>} />
 
       {/* Dept Head Routes */}
       <Route path="/dept-head" element={<ProtectedRoute allowedRoles={["dept_head"]}><DeptHeadDashboard /></ProtectedRoute>} />
@@ -84,6 +94,9 @@ export default function App() {
       <Route path="/dept-head/juniors" element={<ProtectedRoute allowedRoles={["dept_head"]}><MyJuniors /></ProtectedRoute>} />
       <Route path="/dept-head/reports" element={<ProtectedRoute allowedRoles={["dept_head"]}><DeptHeadReports /></ProtectedRoute>} />
       <Route path="/dept-head/manual-queue" element={<ProtectedRoute allowedRoles={["dept_head"]}><DeptHeadManualQueue /></ProtectedRoute>} />
+      <Route path="/dept-head/plans" element={<ProtectedRoute allowedRoles={["dept_head"]}><ImplementationPlansList /></ProtectedRoute>} />
+      <Route path="/dept-head/plan/:ticketId" element={<ProtectedRoute allowedRoles={["dept_head"]}><ImplementationPlanSheet /></ProtectedRoute>} />
+      <Route path="/dept-head/progress/:planId" element={<ProtectedRoute allowedRoles={["dept_head"]}><ProgressSummaryReport /></ProtectedRoute>} />
 
       {/* Officer Routes */}
       <Route path="/officer" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><OfficerDashboard /></ProtectedRoute>} />
@@ -94,6 +107,9 @@ export default function App() {
       <Route path="/officer/heatmap" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><HeatmapView /></ProtectedRoute>} />
       <Route path="/officer/manual-queue" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><ManualQueue /></ProtectedRoute>} />
       <Route path="/officer/reports" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><OfficerReports /></ProtectedRoute>} />
+      <Route path="/officer/plans" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><ImplementationPlansList /></ProtectedRoute>} />
+      <Route path="/officer/plan/:ticketId" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><ImplementationPlanSheet /></ProtectedRoute>} />
+      <Route path="/officer/progress/:planId" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><ProgressSummaryReport /></ProtectedRoute>} />
 
       {/* Legacy Redirects */}
       <Route path="/admin" element={<Navigate to="/officer" />} />
