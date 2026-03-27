@@ -2,7 +2,7 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-const WEBHOOK_BASE = process.env.WEBHOOK_BASE_URL || 'http://localhost:5000';
+const getWebhookBase = () => process.env.WEBHOOK_BASE_URL || 'http://localhost:5000';
 
 /**
  * Validate that Twilio credentials are properly configured (not placeholders).
@@ -52,8 +52,8 @@ function getTwilioClient() {
 async function makeCall(toNumber) {
     const { client, phoneNumber } = getTwilioClient();
 
-    const languageSelectedUrl = `${WEBHOOK_BASE}/api/voice/language-selected`;
-    const recordingCallbackUrl = `${WEBHOOK_BASE}/api/voice/recording-complete`;
+    const languageSelectedUrl = `${getWebhookBase()}/api/voice/language-selected`;
+    const recordingCallbackUrl = `${getWebhookBase()}/api/voice/recording-complete`;
 
     // Inline TwiML: greet → language selection → record complaint
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -80,7 +80,7 @@ async function makeCall(toNumber) {
         to: toNumber,
         from: phoneNumber,
         twiml: twiml,
-        statusCallback: `${WEBHOOK_BASE}/api/voice/call-status`,
+        statusCallback: `${getWebhookBase()}/api/voice/call-status`,
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
     });
 

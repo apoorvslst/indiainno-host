@@ -19,7 +19,7 @@ const telephonyAdapter = require('../services/telephonyAdapter');
 // ── In-memory mapping: phone/CallSid → userId (links calls to logged-in citizens) ──
 const callUserMap = {};
 
-const WEBHOOK_BASE = process.env.WEBHOOK_BASE_URL || 'http://localhost:5000';
+const getWebhookBase = () => process.env.WEBHOOK_BASE_URL || 'http://localhost:5000';
 
 // Use the adapter's isExotelConfigured instead of duplicating the check
 const isExotelConfigured = telephonyAdapter.isExotelConfigured;
@@ -44,7 +44,7 @@ function useExotelDirectInbound() {
 }
 
 function buildLanguageMenuXml() {
-    const languageMenuUrl = `${WEBHOOK_BASE}/api/voice/language-selected`;
+    const languageMenuUrl = `${getWebhookBase()}/api/voice/language-selected`;
     return xmlResponse(`
     <Say voice="Polly.Aditi">Welcome to Civic Sync, the Government Grievance Redressal System.</Say>
     <Gather numDigits="1" action="${languageMenuUrl}" method="POST" timeout="8">
@@ -58,7 +58,7 @@ function buildLanguageMenuXml() {
         <Say voice="Polly.Aditi">Press 7 for Bengali.</Say>
     </Gather>
     <Say voice="Polly.Aditi">No input received. You can speak in any Indian language after the beep. Press the hash key when you are done.</Say>
-    <Record maxLength="120" playBeep="true" action="${WEBHOOK_BASE}/api/voice/recording-complete" finishOnKey="#" trim="trim-silence" />
+    <Record maxLength="120" playBeep="true" action="${getWebhookBase()}/api/voice/recording-complete" finishOnKey="#" trim="trim-silence" />
     <Say voice="Polly.Aditi">We did not receive your recording. Goodbye.</Say>
     `);
 }
@@ -386,7 +386,7 @@ router.post('/language-selected', (req, res) => {
         };
     }
 
-    const recordingCallbackUrl = `${WEBHOOK_BASE}/api/voice/recording-complete`;
+    const recordingCallbackUrl = `${getWebhookBase()}/api/voice/recording-complete`;
 
     const xml = xmlResponse(`
     <Say voice="Polly.Aditi">You selected ${lang.name}.</Say>
@@ -594,7 +594,7 @@ router.get('/status', (req, res) => {
         exotel: hasExotel,
         sarvam: hasSarvam,
         groq: hasGroq,
-        webhookBase: WEBHOOK_BASE,
+        webhookBase: getWebhookBase(),
         endpoints: {
             outbound: 'POST /api/voice/call-me (Twilio preferred, Exotel fallback)',
             exotelInbound: 'POST /api/voice/exotel-incoming (Exotel → Twilio bridge)',

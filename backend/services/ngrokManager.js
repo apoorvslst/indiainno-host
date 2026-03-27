@@ -17,8 +17,10 @@ const path = require('path');
 const axios = require('axios');
 
 const CONFIG = {
-    NGROK_PORT: process.env.NGROK_PORT || 3000,
+    PORT: process.env.PORT || 5000,
+    WEBHOOK_BASE_URL: process.env.WEBHOOK_BASE_URL,
     NGROK_REGION: process.env.NGROK_REGION || 'in',
+    NGROK_PORT: process.env.NGROK_PORT || process.env.PORT || 5000,
     CHECK_INTERVAL: 15000,
     NGROK_API_URL: 'http://127.0.0.1:4040/api/tunnels'
 };
@@ -214,11 +216,12 @@ async function updateTwilioWebhook(baseUrl) {
 }
 
 async function updateExotelWebhook(baseUrl) {
-    const EXOTEL_SID = process.env.EXOTEL_SID;
-    const EXOTEL_TOKEN = process.env.EXOTEL_TOKEN;
+    const EXOTEL_SID = process.env.EXOTEL_ACCOUNT_SID || process.env.EXOTEL_SID;
+    const EXOTEL_API_KEY = process.env.EXOTEL_API_KEY;
+    const EXOTEL_API_TOKEN = process.env.EXOTEL_API_TOKEN || process.env.EXOTEL_TOKEN;
     const EXOTEL_APP_ID = process.env.EXOTEL_APP_ID;
 
-    if (!EXOTEL_SID || !EXOTEL_TOKEN || !EXOTEL_APP_ID) {
+    if (!EXOTEL_SID || !EXOTEL_API_KEY || !EXOTEL_API_TOKEN || !EXOTEL_APP_ID) {
         log('Exotel credentials not found, skipping...', 'yellow');
         return { success: false, reason: 'missing_credentials' };
     }
@@ -237,8 +240,8 @@ async function updateExotelWebhook(baseUrl) {
             },
             {
                 auth: {
-                    username: EXOTEL_SID,
-                    password: EXOTEL_TOKEN
+                    username: EXOTEL_API_KEY,
+                    password: EXOTEL_API_TOKEN
                 },
                 headers: {
                     'Content-Type': 'application/json'
@@ -256,11 +259,12 @@ async function updateExotelWebhook(baseUrl) {
 }
 
 async function updateExotelManualPortal(baseUrl) {
-    const EXOTEL_SID = process.env.EXOTEL_SID;
-    const EXOTEL_TOKEN = process.env.EXOTEL_TOKEN;
-    const EXOTEL_WEBHOOK_NUMBER = process.env.EXOTEL_WEBHOOK_NUMBER;
+    const EXOTEL_SID = process.env.EXOTEL_ACCOUNT_SID || process.env.EXOTEL_SID;
+    const EXOTEL_API_KEY = process.env.EXOTEL_API_KEY;
+    const EXOTEL_API_TOKEN = process.env.EXOTEL_API_TOKEN || process.env.EXOTEL_TOKEN;
+    const EXOTEL_WEBHOOK_NUMBER = process.env.EXOTEL_WEBHOOK_NUMBER || process.env.EXOTEL_PHONE_NUMBER;
 
-    if (!EXOTEL_SID || !EXOTEL_TOKEN || !EXOTEL_WEBHOOK_NUMBER) {
+    if (!EXOTEL_SID || !EXOTEL_API_KEY || !EXOTEL_API_TOKEN || !EXOTEL_WEBHOOK_NUMBER) {
         log('Exotel Manual credentials not found, skipping...', 'yellow');
         return { success: false, reason: 'missing_credentials' };
     }
@@ -278,8 +282,8 @@ async function updateExotelManualPortal(baseUrl) {
             },
             {
                 auth: {
-                    username: EXOTEL_SID,
-                    password: EXOTEL_TOKEN
+                    username: EXOTEL_API_KEY,
+                    password: EXOTEL_API_TOKEN
                 },
                 headers: {
                     'Content-Type': 'application/json'

@@ -14,7 +14,7 @@ const EXOTEL_API_TOKEN = process.env.EXOTEL_API_TOKEN;
 const EXOTEL_ACCOUNT_SID = process.env.EXOTEL_ACCOUNT_SID || process.env.EXOTEL_SID;
 const EXOTEL_SUBDOMAIN = process.env.EXOTEL_SUBDOMAIN || 'api.exotel.com';
 const EXOTEL_PHONE_NUMBER = process.env.EXOTEL_PHONE_NUMBER;
-const WEBHOOK_BASE_URL = (process.env.WEBHOOK_BASE_URL || 'http://localhost:5000').replace(/\/+$/, '');
+const getWebhookBaseUrl = () => (process.env.WEBHOOK_BASE_URL || 'http://localhost:5000').replace(/\/+$/, '');
 const PUBLIC_ASSET_PATH = process.env.PUBLIC_ASSET_PATH || 'public/responses';
 const SARVAM_API_KEY = process.env.SARVAM_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
@@ -75,8 +75,8 @@ async function makeCall(citizenPhone) {
     const exotelNumber = normalizeIndianNumber(EXOTEL_PHONE_NUMBER);
     const to = normalizeIndianNumber(process.env.EXOTEL_DESTINATION_NUMBER || EXOTEL_PHONE_NUMBER);
 
-    const appletUrl = process.env.EXOTEL_APPLET_URL || `${WEBHOOK_BASE_URL}/api/voice/incoming`;
-    const statusCallbackUrl = process.env.EXOTEL_STATUS_CALLBACK_URL || `${WEBHOOK_BASE_URL}/api/voice/call-status`;
+    const appletUrl = process.env.EXOTEL_APPLET_URL || `${getWebhookBaseUrl()}/api/voice/incoming`;
+    const statusCallbackUrl = process.env.EXOTEL_STATUS_CALLBACK_URL || `${getWebhookBaseUrl()}/api/voice/call-status`;
 
     const payload = {
         From: from,
@@ -132,9 +132,9 @@ async function initiateCall(userPhoneNumber) {
 
     const toNumber = normalizeIndianNumber(userPhoneNumber);
     if (!toNumber) throw new Error('Invalid user phone number');
-    if (!WEBHOOK_BASE_URL) throw new Error('Missing WEBHOOK_BASE_URL');
+    if (!getWebhookBaseUrl()) throw new Error('Missing WEBHOOK_BASE_URL');
 
-    const callbackUrl = `${WEBHOOK_BASE_URL}/incoming-handler`;
+    const callbackUrl = `${getWebhookBaseUrl()}/incoming-handler`;
     const formBody = new URLSearchParams({
         From: EXOTEL_PHONE_NUMBER,
         To: toNumber,
@@ -430,7 +430,7 @@ async function saveResponseAudio(buffer, extension = 'mp3') {
     const absoluteFilePath = path.join(responsesDir, fileName);
     await fs.writeFile(absoluteFilePath, buffer);
 
-    const baseUrl = WEBHOOK_BASE_URL.replace(/\/+$/, '');
+    const baseUrl = getWebhookBaseUrl();
     const audioUrl = `${baseUrl}/${normalizedAssetPath}/${fileName}`;
     console.log('[saveResponseAudio] File saved to:', absoluteFilePath);
     console.log('[saveResponseAudio] Public URL:', audioUrl);
