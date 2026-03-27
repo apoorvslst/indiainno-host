@@ -3,6 +3,7 @@ import DashboardLayout from "../../components/DashboardLayout";
 import api from "../../utils/api";
 import { TICKET_STATUSES } from "../../data/departments";
 import toast from "react-hot-toast";
+import { HiOutlineShieldCheck, HiArrowRight } from "react-icons/hi";
 
 export default function MyComplaints() {
     const [complaints, setComplaints] = useState([]);
@@ -74,6 +75,28 @@ export default function MyComplaints() {
 
     return (
         <DashboardLayout title="My Complaints" subtitle="Track all your submitted complaints">
+            {/* ── Anti-Corruption Banner ── */}
+            <div className="mb-6 bg-white rounded-xl p-5 flex items-start sm:items-center justify-between flex-col sm:flex-row gap-4 border border-[var(--color-border)] shadow-sm animate-fadeInUp">
+                <div className="flex items-center gap-4 text-[var(--color-text)]">
+                    <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0 border border-green-100">
+                        <HiOutlineShieldCheck className="text-2xl text-green-600" />
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-base text-[var(--color-text)]">Looking for an Anti-Corruption Report?</h4>
+                        <p className="text-sm text-[var(--color-text-muted)] mt-0.5">
+                            For your safety, corruption reports are <strong className="text-green-600 font-semibold">100% anonymous</strong> and are NOT linked to this dashboard.
+                            You must use your 16-digit Secure Token to track them.
+                        </p>
+                    </div>
+                </div>
+                <button
+                    onClick={() => window.location.href = '/citizen/track-report'}
+                    className="flex-shrink-0 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg transition-colors shadow-sm flex items-center gap-2"
+                >
+                    Track Secure Report <HiArrowRight />
+                </button>
+            </div>
+
             {/* Filters */}
             <div className="flex flex-wrap gap-2 mb-6 animate-fadeInUp">
                 <button
@@ -111,71 +134,71 @@ export default function MyComplaints() {
                         const category = c.ticket?.primaryCategory || c.intentCategory;
                         return (
                             <div key={c.id} className="card animate-fadeInUp hover:bg-[var(--color-card-hover)]">
-<div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-[var(--color-primary)]/10 flex items-center justify-center text-2xl flex-shrink-0">
-                {getCategoryIcon(category)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  {c.ticket?.ticketNumber && <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded-sm">{c.ticket.ticketNumber}</span>}
-                  <h3 className="font-semibold">{category?.replace(/_/g, " ")}</h3>
-                  <span className={`badge status-${status.toLowerCase()}`}>{status.replace(/_/g, " ")}</span>
-                  <span className={`badge severity-${severity.toLowerCase()}`}>{severity}</span>
-                  {c.ticket?.source === 'voice_call' && <span className="badge bg-purple-100 text-purple-700">📞 Voice</span>}
-                </div>
-                <p className="text-sm text-[var(--color-text-muted)] mb-2 line-clamp-2">{c.transcriptOriginal}</p>
-                
-                {/* LOCATION & DATE INFO */}
-                <div className="flex items-center gap-4 text-xs text-[var(--color-text-muted)]">
-                  {c.extractedLandmark && <span>📍 {c.extractedLandmark}</span>}
-                  {c.ticket?.locality && <span>🏘️ {c.ticket.locality}</span>}
-                  {c.ticket?.wardNumber && <span>🏛️ Ward {c.ticket.wardNumber}</span>}
-                  <span>🕐 {new Date(c.createdAt).toLocaleDateString()}</span>
-                  {c.ticket?.complaintCount > 1 && (
-                    <span className="text-[var(--color-warning)]">👥 {c.ticket.complaintCount} reports</span>
-                  )}
-                </div>
-                
-                {/* ═══ DEPARTMENT & LEVEL INFO - PROMINENT DISPLAY ═══ */}
-                <div className="mt-3 p-3 rounded-lg border-2" style={{ 
-                  backgroundColor: c.ticket?.level === 1 ? '#f0fdf4' : c.ticket?.level === 2 ? '#fefce8' : c.ticket?.level === 3 ? '#fff7ed' : '#fef2f2',
-                  borderColor: c.ticket?.level === 1 ? '#22c55e' : c.ticket?.level === 2 ? '#eab308' : c.ticket?.level === 3 ? '#f97316' : '#ef4444'
-                }}>
-                  <div className="flex flex-wrap items-center gap-3">
-                    {/* DEPARTMENT */}
-                    <div className="flex items-center gap-1">
-                      <span className="text-lg">🏢</span>
-                      <div>
-                        <span className="text-xs text-gray-500">Department</span>
-                        <p className="font-bold text-sm uppercase" style={{ color: c.ticket?.level === 1 ? '#166534' : c.ticket?.level === 2 ? '#854d0e' : c.ticket?.level === 3 ? '#9a3412' : '#991b1b' }}>
-                          {c.ticket?.department || 'municipal'}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {/* LEVEL */}
-                    <div className="flex items-center gap-1 px-3 py-1 rounded-full" style={{ backgroundColor: c.ticket?.level === 1 ? '#dcfce7' : c.ticket?.level === 2 ? '#fef9c3' : c.ticket?.level === 3 ? '#ffedd5' : '#fecaca' }}>
-                      <span className="text-xs text-gray-600">Level</span>
-                      <span className="font-bold text-lg" style={{ color: c.ticket?.level === 1 ? '#166534' : c.ticket?.level === 2 ? '#854d0e' : c.ticket?.level === 3 ? '#9a3412' : '#991b1b' }}>
-                        {c.ticket?.level || 1}
-                      </span>
-                    </div>
-                    
-                    {/* RESPONSIBLE AUTHORITY */}
-                    <div className="flex items-center gap-1">
-                      <span className="text-lg">👤</span>
-                      <div>
-                        <span className="text-xs text-gray-500">Responsible Authority</span>
-                        <p className="font-semibold text-sm">
-                          {c.ticket?.level === 1 ? 'Junior Engineer' : 
-                           c.ticket?.level === 2 ? 'Dept Head / BDO' : 
-                           c.ticket?.level === 3 ? 'Officer / Commissioner' : 
-                           'Top Authority / SDM'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                                <div className="flex items-start gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-[var(--color-primary)]/10 flex items-center justify-center text-2xl flex-shrink-0">
+                                        {getCategoryIcon(category)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                                            {c.ticket?.ticketNumber && <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded-sm">{c.ticket.ticketNumber}</span>}
+                                            <h3 className="font-semibold">{category?.replace(/_/g, " ")}</h3>
+                                            <span className={`badge status-${status.toLowerCase()}`}>{status.replace(/_/g, " ")}</span>
+                                            <span className={`badge severity-${severity.toLowerCase()}`}>{severity}</span>
+                                            {c.ticket?.source === 'voice_call' && <span className="badge bg-purple-100 text-purple-700">📞 Voice</span>}
+                                        </div>
+                                        <p className="text-sm text-[var(--color-text-muted)] mb-2 line-clamp-2">{c.transcriptOriginal}</p>
+
+                                        {/* LOCATION & DATE INFO */}
+                                        <div className="flex items-center gap-4 text-xs text-[var(--color-text-muted)]">
+                                            {c.extractedLandmark && <span>📍 {c.extractedLandmark}</span>}
+                                            {c.ticket?.locality && <span>🏘️ {c.ticket.locality}</span>}
+                                            {c.ticket?.wardNumber && <span>🏛️ Ward {c.ticket.wardNumber}</span>}
+                                            <span>🕐 {new Date(c.createdAt).toLocaleDateString()}</span>
+                                            {c.ticket?.complaintCount > 1 && (
+                                                <span className="text-[var(--color-warning)]">👥 {c.ticket.complaintCount} reports</span>
+                                            )}
+                                        </div>
+
+                                        {/* ═══ DEPARTMENT & LEVEL INFO - PROMINENT DISPLAY ═══ */}
+                                        <div className="mt-3 p-3 rounded-lg border-2" style={{
+                                            backgroundColor: c.ticket?.level === 1 ? '#f0fdf4' : c.ticket?.level === 2 ? '#fefce8' : c.ticket?.level === 3 ? '#fff7ed' : '#fef2f2',
+                                            borderColor: c.ticket?.level === 1 ? '#22c55e' : c.ticket?.level === 2 ? '#eab308' : c.ticket?.level === 3 ? '#f97316' : '#ef4444'
+                                        }}>
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                {/* DEPARTMENT */}
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-lg">🏢</span>
+                                                    <div>
+                                                        <span className="text-xs text-gray-500">Department</span>
+                                                        <p className="font-bold text-sm uppercase" style={{ color: c.ticket?.level === 1 ? '#166534' : c.ticket?.level === 2 ? '#854d0e' : c.ticket?.level === 3 ? '#9a3412' : '#991b1b' }}>
+                                                            {c.ticket?.department || 'municipal'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {/* LEVEL */}
+                                                <div className="flex items-center gap-1 px-3 py-1 rounded-full" style={{ backgroundColor: c.ticket?.level === 1 ? '#dcfce7' : c.ticket?.level === 2 ? '#fef9c3' : c.ticket?.level === 3 ? '#ffedd5' : '#fecaca' }}>
+                                                    <span className="text-xs text-gray-600">Level</span>
+                                                    <span className="font-bold text-lg" style={{ color: c.ticket?.level === 1 ? '#166534' : c.ticket?.level === 2 ? '#854d0e' : c.ticket?.level === 3 ? '#9a3412' : '#991b1b' }}>
+                                                        {c.ticket?.level || 1}
+                                                    </span>
+                                                </div>
+
+                                                {/* RESPONSIBLE AUTHORITY */}
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-lg">👤</span>
+                                                    <div>
+                                                        <span className="text-xs text-gray-500">Responsible Authority</span>
+                                                        <p className="font-semibold text-sm">
+                                                            {c.ticket?.level === 1 ? 'Junior Engineer' :
+                                                                c.ticket?.level === 2 ? 'Dept Head / BDO' :
+                                                                    c.ticket?.level === 3 ? 'Officer / Commissioner' :
+                                                                        'Top Authority / SDM'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
 
                                         {/* ─── Assigned Official + Responsibility Info ─── */}
                                         {(() => {

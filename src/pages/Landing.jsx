@@ -1,7 +1,19 @@
 import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { HiOutlinePhone, HiOutlineLocationMarker, HiOutlineShieldCheck, HiOutlineUserGroup, HiOutlineChartBar, HiOutlineLightningBolt } from "react-icons/hi";
+import axios from "axios";
+
+const AC_API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export default function Landing() {
+    const [acStats, setAcStats] = useState(null);
+
+    useEffect(() => {
+        axios.get(`${AC_API_BASE}/anticorruption/dashboard-stats`)
+            .then(res => setAcStats(res.data))
+            .catch(() => setAcStats({ totalReports: 0, casesResolved: 0, avgResolutionTime: 'N/A', departmentHighestIntegrity: 'N/A', resolutionRate: 0 }));
+    }, []);
+
     return (
         <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#f1f5f9", fontFamily: "'Noto Sans', sans-serif", color: "#1e293b" }}>
 
@@ -156,6 +168,56 @@ export default function Landing() {
                             </div>
                         ))}
                     </div>
+                </div>
+            </section>
+
+            {/* ═══ TRANSPARENCY DASHBOARD ═══ */}
+            <section style={{ padding: "60px 24px", background: "#f0fdf4", borderTop: "1px solid #bbf7d0" }}>
+                <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+                    <div style={{ textAlign: "center", marginBottom: 48 }}>
+                        <h2 style={{ fontSize: 28, fontWeight: 800, color: "#166534", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+                            Anti-Corruption Transparency
+                        </h2>
+                        <div style={{ width: 80, height: 4, background: "#16a34a", margin: "0 auto 16px auto", borderRadius: 2 }} />
+                        <p style={{ color: "#15803d", fontSize: 16 }}>Real-time metrics from our Anti-Corruption Department</p>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 24 }}>
+                        {[
+                            { value: acStats?.totalReports ?? '—', label: "Total Reports", color: "#1e3a8a", bg: "#eff6ff" },
+                            { value: acStats?.casesResolved ?? '—', label: "Cases Resolved", color: "#16a34a", bg: "#f0fdf4" },
+                            { value: acStats?.avgResolutionTime ?? '—', label: "Avg Resolution Time", color: "#f59e0b", bg: "#fffbeb" },
+                            { value: acStats?.departmentHighestIntegrity ?? '—', label: "Highest Integrity Dept", color: "#7c3aed", bg: "#f5f3ff" },
+                        ].map((stat, i) => (
+                            <div key={i} style={{
+                                background: "#ffffff", border: "1px solid #e2e8f0",
+                                borderTop: `4px solid ${stat.color}`, borderRadius: 8,
+                                padding: "28px 20px", textAlign: "center",
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.06)"
+                            }}>
+                                <div style={{ fontSize: 36, fontWeight: 900, color: stat.color, marginBottom: 8, lineHeight: 1 }}>
+                                    {stat.value}
+                                </div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                                    {stat.label}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {acStats && acStats.resolutionRate > 0 && (
+                        <div style={{ textAlign: "center", marginTop: 32 }}>
+                            <div style={{
+                                display: "inline-flex", alignItems: "center", gap: 8,
+                                background: "#dcfce7", color: "#166534",
+                                padding: "6px 20px", borderRadius: 20,
+                                fontSize: 14, fontWeight: 700
+                            }}>
+                                <HiOutlineShieldCheck style={{ fontSize: 18 }} />
+                                {acStats.resolutionRate}% Resolution Rate
+                            </div>
+                        </div>
+                    )}
                 </div>
             </section>
 

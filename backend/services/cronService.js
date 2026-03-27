@@ -74,9 +74,9 @@ async function runTicketProgressDeduction() {
 
             // Deduct points
             assignee.performancePoints = Math.max(0, assignee.performancePoints - POINTS_DEDUCTION_DELAY);
-            
+
             console.log(`[CronService] Deducted ${POINTS_DEDUCTION_DELAY}pts from ${assignee.name} — ticket ${ticket.ticketNumber} no progress for ${INACTIVITY_THRESHOLD_DAYS_TICKET} days`);
-            
+
             // Add to ticket action history
             ticket.actionHistory.push({
                 actionDate: new Date(),
@@ -101,6 +101,15 @@ async function runTicketProgressDeduction() {
 async function runDeductionCycle() {
     await runInactivityDeduction();
     await runTicketProgressDeduction();
+
+    // Anti-Corruption: escalate complaints unassigned for >48 hours
+    try {
+        const { checkEscalation } = require('./anticorruptionService');
+        await checkEscalation();
+    } catch (err) {
+        console.error('[CronService] AC escalation check error:', err.message);
+    }
+
     console.log('[CronService] All daily checks complete');
 }
 
