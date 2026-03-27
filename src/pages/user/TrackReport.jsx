@@ -2,17 +2,17 @@ import { useState } from "react";
 import DashboardLayout from "../../components/DashboardLayout";
 import api from "../../utils/api";
 import toast from "react-hot-toast";
-import { HiOutlineSearch, HiOutlineShieldCheck, HiOutlineClock, HiOutlineCheckCircle, HiOutlineExclamation } from "react-icons/hi";
+import { HiOutlineSearch, HiOutlineShieldCheck, HiOutlineClock, HiOutlineCheckCircle, HiOutlineExclamation, HiOutlineUser, HiOutlineFolder, HiOutlineDocumentText, HiOutlineSearchCircle } from "react-icons/hi";
 
 const STATUS_CONFIG = {
-    Submitted: { color: "#6366f1", bg: "#eef2ff", icon: "📝", label: "Submitted" },
-    Unassigned: { color: "#f59e0b", bg: "#fffbeb", icon: "⏳", label: "Awaiting Assignment" },
-    Assigned: { color: "#3b82f6", bg: "#eff6ff", icon: "👤", label: "Assigned to Officer" },
-    Under_Investigation: { color: "#8b5cf6", bg: "#f5f3ff", icon: "🔍", label: "Under Investigation" },
-    Verified: { color: "#10b981", bg: "#ecfdf5", icon: "✅", label: "Verified" },
-    Insufficient_Evidence: { color: "#ef4444", bg: "#fef2f2", icon: "⚠️", label: "Insufficient Evidence" },
-    Action_Taken: { color: "#059669", bg: "#ecfdf5", icon: "⚖️", label: "Action Taken" },
-    Closed: { color: "#64748b", bg: "#f8fafc", icon: "📁", label: "Case Closed" },
+    Submitted: { color: "#6366f1", bg: "#eef2ff", icon: <HiOutlineDocumentText />, label: "Submitted" },
+    Unassigned: { color: "#f59e0b", bg: "#fffbeb", icon: <HiOutlineClock />, label: "Awaiting Assignment" },
+    Assigned: { color: "#3b82f6", bg: "#eff6ff", icon: <HiOutlineUser />, label: "Assigned to Officer" },
+    Under_Investigation: { color: "#8b5cf6", bg: "#f5f3ff", icon: <HiOutlineSearchCircle />, label: "Under Investigation" },
+    Verified: { color: "#10b981", bg: "#ecfdf5", icon: <HiOutlineCheckCircle />, label: "Verified" },
+    Insufficient_Evidence: { color: "#ef4444", bg: "#fef2f2", icon: <HiOutlineExclamation />, label: "Insufficient Evidence" },
+    Action_Taken: { color: "#059669", bg: "#ecfdf5", icon: <HiOutlineShieldCheck />, label: "Action Taken" },
+    Closed: { color: "#64748b", bg: "#f8fafc", icon: <HiOutlineFolder />, label: "Case Closed" },
 };
 
 const LEVEL_CONFIG = {
@@ -97,7 +97,7 @@ export default function TrackReport() {
                         <div className="card">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" style={{ background: statusConf.bg }}>
+                                    <div className="w-12 h-12 rounded flex items-center justify-center text-2xl" style={{ background: statusConf.bg }}>
                                         {statusConf.icon}
                                     </div>
                                     <div>

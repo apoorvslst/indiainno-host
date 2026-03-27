@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import DashboardLayout from "../../components/DashboardLayout";
 import api from "../../utils/api";
 import toast from "react-hot-toast";
-import { HiOutlineShieldCheck, HiOutlineUpload, HiOutlineDocumentText, HiOutlineFilm, HiOutlineMusicNote, HiOutlineX, HiOutlineClipboardCopy, HiOutlineLockClosed, HiOutlineLocationMarker } from "react-icons/hi";
+import { HiOutlineShieldCheck, HiOutlineUpload, HiOutlineDocumentText, HiOutlineFilm, HiOutlineMusicNote, HiOutlineX, HiOutlineClipboardCopy, HiOutlineLockClosed, HiOutlineLocationMarker, HiOutlineExclamation } from "react-icons/hi";
 import { Link } from "react-router-dom";
 import Swal from 'sweetalert2';
 
@@ -193,7 +193,7 @@ export default function AnonymousReport() {
                         </p>
 
                         {/* Token Display */}
-                        <div className="bg-[#0f172a] rounded-xl p-6 mb-4">
+                        <div className="bg-[#0f172a] rounded p-6 mb-4">
                             <p className="text-xs text-slate-400 uppercase tracking-widest mb-2 font-semibold">Your Secure Tracking Token</p>
                             <div className="flex items-center justify-center gap-3">
                                 <span className="font-mono text-2xl text-white tracking-[0.25em] font-bold">
@@ -223,7 +223,7 @@ export default function AnonymousReport() {
                         </div>
 
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 text-left">
-                            <p className="text-sm text-amber-800 font-semibold mb-1">⚠️ Save This Token</p>
+                            <p className="text-sm text-amber-800 font-semibold mb-1 flex items-center gap-1"><HiOutlineExclamation className="text-lg" /> Save This Token</p>
                             <p className="text-xs text-amber-700">
                                 This is the ONLY way to track your report. We do not store your name, phone, or email.
                                 Write this token down or save a screenshot.
@@ -251,7 +251,7 @@ export default function AnonymousReport() {
                 <form onSubmit={handleSubmit} className="space-y-6 animate-fadeInUp lg:col-span-2">
 
                     {/* Anonymous Notice */}
-                    <div className="bg-white border border-[var(--color-border)] rounded-xl p-5 flex items-start gap-4 shadow-sm">
+                    <div className="bg-white border border-[var(--color-border)] rounded p-5 flex items-start gap-4 shadow-sm">
                         <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0 mt-0.5 border border-green-100">
                             <HiOutlineShieldCheck className="text-green-600 text-xl" />
                         </div>
@@ -327,7 +327,7 @@ export default function AnonymousReport() {
 
                         {/* Drop Zone */}
                         <div
-                            className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${dragActive
+                            className={`border-2 border-dashed rounded p-8 text-center cursor-pointer transition-all ${dragActive
                                 ? 'border-purple-500 bg-purple-50 scale-[1.01]'
                                 : 'border-[var(--color-border)] hover:border-purple-400 hover:bg-purple-50/50'
                                 }`}

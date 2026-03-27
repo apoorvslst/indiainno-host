@@ -39,7 +39,7 @@ export default function SubmitComplaint() {
     });
 
     const [imagePreviews, setImagePreviews] = useState([]);
-    
+
     // Voice Recording State
     const [isRecording, setIsRecording] = useState(false);
     const [isProcessingVoice, setIsProcessingVoice] = useState(false);
@@ -149,7 +149,7 @@ export default function SubmitComplaint() {
             timerRef.current = setInterval(() => {
                 setRecordingDuration(prev => prev + 1);
             }, 1000);
-            toast("Recording started... Speak your complaint clearly.", { icon: "🎙️" });
+            toast.success("Recording started... Speak your complaint clearly.");
         } catch (err) {
             console.error("Microphone access error:", err);
             toast.error("Could not access microphone. Please check permissions.");
@@ -225,7 +225,7 @@ export default function SubmitComplaint() {
             }
 
             if (data.needsManualGeo) {
-                toast("📌 Location unclear — ticket sent to manual review queue.", { icon: "⚠️" });
+                toast.error("Location unclear — ticket sent to manual review queue.");
             }
 
             navigate("/citizen/complaints");
@@ -243,19 +243,18 @@ export default function SubmitComplaint() {
                     <div className="card">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg font-semibold flex items-center gap-2">
-                                <span className="w-7 h-7 rounded-lg bg-[var(--color-primary)]/20 flex items-center justify-center text-sm font-bold text-[var(--color-primary-light)]">1</span>
+                                <span className="w-7 h-7 rounded bg-[var(--color-primary)]/20 flex items-center justify-center text-sm font-bold text-[var(--color-primary-light)]">1</span>
                                 What's the issue?
                             </h3>
-                            
+
                             <button
                                 type="button"
                                 onClick={isRecording ? stopRecording : startRecording}
                                 disabled={isProcessingVoice}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all shadow-sm ${
-                                    isRecording 
-                                        ? 'bg-red-500 text-white animate-pulse shadow-red-500/40' 
+                                className={`flex items-center gap-2 px-4 py-2 rounded text-sm font-semibold transition-all shadow-sm ${isRecording
+                                        ? 'bg-red-500 text-white animate-pulse shadow-red-500/40'
                                         : 'bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 hover:scale-105 active:scale-95'
-                                }`}
+                                    }`}
                             >
                                 {isProcessingVoice ? (
                                     <><div className="spinner w-3.5 h-3.5 border-2 border-current" /> Auto-filling Form...</>
@@ -286,8 +285,8 @@ export default function SubmitComplaint() {
                                 </select>
                             </div>
                             {form.department && (
-                                <div className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] bg-[var(--color-surface)] rounded-lg p-3">
-                                    <span>🏛️</span>
+                                <div className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] bg-[var(--color-surface)] rounded p-3">
+                                    <span><HiOutlineLocationMarker className="text-lg" /></span>
                                     <span>Auto-routed to: <strong className="text-[var(--color-text)]">{DEPARTMENTS.find(d => d.id === form.department)?.name}</strong></span>
                                 </div>
                             )}
@@ -308,11 +307,11 @@ export default function SubmitComplaint() {
                     {/* Evidence: Photo Upload */}
                     <div className="card">
                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <span className="w-7 h-7 rounded-lg bg-[#f59e0b]/20 flex items-center justify-center text-sm font-bold text-[#f59e0b]">2</span>
+                            <span className="w-7 h-7 rounded bg-[#f59e0b]/20 flex items-center justify-center text-sm font-bold text-[#f59e0b]">2</span>
                             Upload Evidence Photos
                         </h3>
-                        <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors border-[var(--color-border)] hover:border-[var(--color-primary)]">
-                            <div className="w-12 h-12 rounded-full bg-[var(--color-card)] flex items-center justify-center mb-3 shadow-lg">
+                        <label className="flex flex-col items-center justify-center border-2 border-dashed rounded p-6 cursor-pointer transition-colors border-[var(--color-border)] hover:border-[var(--color-primary)]">
+                            <div className="w-12 h-12 rounded bg-[var(--color-card)] flex items-center justify-center mb-3 shadow-lg">
                                 <HiOutlinePhotograph className="text-2xl text-[var(--color-primary)]" />
                             </div>
                             <p className="text-sm font-medium">Tap to Upload Photos (max 5)</p>
@@ -323,11 +322,11 @@ export default function SubmitComplaint() {
                             <div className="flex flex-wrap gap-3 mt-4">
                                 {imagePreviews.map((src, i) => (
                                     <div key={i} className="relative group">
-                                        <img src={src} alt={`Evidence ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border border-[var(--color-border)]" />
+                                        <img src={src} alt={`Evidence ${i + 1}`} className="w-20 h-20 object-cover rounded border border-[var(--color-border)]" />
                                         <button
                                             type="button"
                                             onClick={() => removeImage(i)}
-                                            className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                            className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                                         >×</button>
                                     </div>
                                 ))}
@@ -338,7 +337,7 @@ export default function SubmitComplaint() {
                     {/* Location */}
                     <div className="card">
                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <span className="w-7 h-7 rounded-lg bg-[var(--color-accent)]/20 flex items-center justify-center text-sm font-bold text-[var(--color-accent-light)]">3</span>
+                            <span className="w-7 h-7 rounded bg-[var(--color-accent)]/20 flex items-center justify-center text-sm font-bold text-[var(--color-accent-light)]">3</span>
                             Where is it?
                         </h3>
                         <div className="space-y-4">
@@ -387,8 +386,8 @@ export default function SubmitComplaint() {
                                     )}
                                 </button>
                                 {form.lat && (
-                                    <div className="mt-2 text-xs text-[var(--color-text-muted)] bg-[var(--color-surface)] rounded-lg p-3">
-                                        📍 Lat: {form.lat.toFixed(6)}, Lng: {form.lng.toFixed(6)} (±{Math.round(form.accuracy)}m)
+                                    <div className="mt-2 text-xs text-[var(--color-text-muted)] bg-[var(--color-surface)] rounded p-3 flex items-center gap-1">
+                                        <HiOutlineLocationMarker className="text-sm" /> Lat: {form.lat.toFixed(6)}, Lng: {form.lng.toFixed(6)} (±{Math.round(form.accuracy)}m)
                                     </div>
                                 )}
                             </div>

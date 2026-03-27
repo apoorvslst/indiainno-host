@@ -1,68 +1,75 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { getRoleTitle } from "../config/roleConfig";
-import { HiOutlineMenu, HiOutlineX, HiOutlineLogout } from "react-icons/hi";
+import {
+    HiOutlineMenu, HiOutlineX, HiOutlineLogout,
+    HiOutlineChartBar, HiOutlinePencilAlt, HiOutlineClipboardList,
+    HiOutlineMap, HiOutlineShieldCheck, HiOutlineSearchCircle,
+    HiOutlineLibrary, HiOutlineFire, HiOutlineClock,
+    HiOutlineExclamation, HiOutlineUserGroup, HiOutlineDocumentText,
+    HiOutlineTag, HiOutlineTicket, HiOutlineOfficeBuilding, HiOutlineSun
+} from "react-icons/hi";
 import { useState } from "react";
 
 const NAV_LINKS = {
     citizen: [
-        { to: "/citizen", label: "Dashboard", icon: "📊" },
-        { to: "/citizen/submit", label: "Submit Complaint", icon: "📝" },
-        { to: "/citizen/complaints", label: "My Complaints", icon: "📋" },
-        { to: "/citizen/map", label: "City Map", icon: "🗺️" },
-        { to: "/citizen/anonymous-report", label: "Anti-Corruption", icon: "🛡️" },
-        { to: "/citizen/track-report", label: "Track AC Report", icon: "🔍" },
-        { to: "/schemes", label: "Govt Schemes", icon: "🏛️" },
+        { to: "/citizen", label: "Dashboard", icon: <HiOutlineChartBar /> },
+        { to: "/citizen/submit", label: "Submit Complaint", icon: <HiOutlinePencilAlt /> },
+        { to: "/citizen/complaints", label: "My Complaints", icon: <HiOutlineClipboardList /> },
+        { to: "/citizen/map", label: "City Map", icon: <HiOutlineMap /> },
+        { to: "/citizen/anonymous-report", label: "Anti-Corruption", icon: <HiOutlineShieldCheck /> },
+        { to: "/citizen/track-report", label: "Track AC Report", icon: <HiOutlineSearchCircle /> },
+        { to: "/schemes", label: "Govt Schemes", icon: <HiOutlineLibrary /> },
     ],
     user: [
-        { to: "/citizen", label: "Dashboard", icon: "📊" },
-        { to: "/citizen/submit", label: "Submit Complaint", icon: "📝" },
-        { to: "/citizen/complaints", label: "My Complaints", icon: "📋" },
-        { to: "/citizen/map", label: "City Map", icon: "🗺️" },
-        { to: "/citizen/anonymous-report", label: "Anti-Corruption", icon: "🛡️" },
-        { to: "/citizen/track-report", label: "Track AC Report", icon: "🔍" },
-        { to: "/schemes", label: "Govt Schemes", icon: "🏛️" },
+        { to: "/citizen", label: "Dashboard", icon: <HiOutlineChartBar /> },
+        { to: "/citizen/submit", label: "Submit Complaint", icon: <HiOutlinePencilAlt /> },
+        { to: "/citizen/complaints", label: "My Complaints", icon: <HiOutlineClipboardList /> },
+        { to: "/citizen/map", label: "City Map", icon: <HiOutlineMap /> },
+        { to: "/citizen/anonymous-report", label: "Anti-Corruption", icon: <HiOutlineShieldCheck /> },
+        { to: "/citizen/track-report", label: "Track AC Report", icon: <HiOutlineSearchCircle /> },
+        { to: "/schemes", label: "Govt Schemes", icon: <HiOutlineLibrary /> },
     ],
     junior: [
-        { to: "/junior", label: "Dashboard", icon: "📊" },
-        { to: "/junior/plans", label: "Implementation Plans", icon: "📋" },
-        { to: "/officer/heatmap", label: "Heatmap", icon: "🔥" },
+        { to: "/junior", label: "Dashboard", icon: <HiOutlineChartBar /> },
+        { to: "/junior/plans", label: "Implementation Plans", icon: <HiOutlineClipboardList /> },
+        { to: "/officer/heatmap", label: "Heatmap", icon: <HiOutlineFire /> },
     ],
     engineer: [
-        { to: "/junior", label: "Dashboard", icon: "📊" },
-        { to: "/junior/plans", label: "Implementation Plans", icon: "📋" },
-        { to: "/officer/heatmap", label: "Heatmap", icon: "🔥" },
+        { to: "/junior", label: "Dashboard", icon: <HiOutlineChartBar /> },
+        { to: "/junior/plans", label: "Implementation Plans", icon: <HiOutlineClipboardList /> },
+        { to: "/officer/heatmap", label: "Heatmap", icon: <HiOutlineFire /> },
     ],
     dept_head: [
-        { to: "/dept-head", label: "Dashboard", icon: "📊" },
-        { to: "/dept-head/plans", label: "Implementation Plans", icon: "📋" },
-        { to: "/officer/heatmap", label: "Heatmap", icon: "🔥" },
-        { to: "/dept-head/pending", label: "Pending Cases", icon: "⏳" },
-        { to: "/dept-head/sla", label: "SLA Cares", icon: "⚠️" },
-        { to: "/dept-head/juniors", label: "My Juniors", icon: "👷" },
-        { to: "/dept-head/reports", label: "Reports", icon: "📄" },
-        { to: "/dept-head/manual-queue", label: "Manual Queue", icon: "📌" },
+        { to: "/dept-head", label: "Dashboard", icon: <HiOutlineChartBar /> },
+        { to: "/dept-head/plans", label: "Implementation Plans", icon: <HiOutlineClipboardList /> },
+        { to: "/officer/heatmap", label: "Heatmap", icon: <HiOutlineFire /> },
+        { to: "/dept-head/pending", label: "Pending Cases", icon: <HiOutlineClock /> },
+        { to: "/dept-head/sla", label: "SLA Cares", icon: <HiOutlineExclamation /> },
+        { to: "/dept-head/juniors", label: "My Juniors", icon: <HiOutlineUserGroup /> },
+        { to: "/dept-head/reports", label: "Reports", icon: <HiOutlineDocumentText /> },
+        { to: "/dept-head/manual-queue", label: "Manual Queue", icon: <HiOutlineTag /> },
     ],
     officer: [
-        { to: "/officer", label: "Dashboard", icon: "📊" },
-        { to: "/officer/tickets", label: "Tickets", icon: "🎫" },
-        { to: "/officer/plans", label: "Implementation Plans", icon: "📋" },
-        { to: "/officer/map", label: "Live Map", icon: "🗺️" },
-        { to: "/officer/heatmap", label: "Heatmap", icon: "🔥" },
-        { to: "/officer/engineers", label: "Officials", icon: "👷" },
-        { to: "/officer/departments", label: "Departments", icon: "🏛️" },
-        { to: "/officer/manual-queue", label: "Manual Queue", icon: "📌" },
-        { to: "/officer/reports", label: "Reports", icon: "📄" },
+        { to: "/officer", label: "Dashboard", icon: <HiOutlineChartBar /> },
+        { to: "/officer/tickets", label: "Tickets", icon: <HiOutlineTicket /> },
+        { to: "/officer/plans", label: "Implementation Plans", icon: <HiOutlineClipboardList /> },
+        { to: "/officer/map", label: "Live Map", icon: <HiOutlineMap /> },
+        { to: "/officer/heatmap", label: "Heatmap", icon: <HiOutlineFire /> },
+        { to: "/officer/engineers", label: "Officials", icon: <HiOutlineUserGroup /> },
+        { to: "/officer/departments", label: "Departments", icon: <HiOutlineLibrary /> },
+        { to: "/officer/manual-queue", label: "Manual Queue", icon: <HiOutlineTag /> },
+        { to: "/officer/reports", label: "Reports", icon: <HiOutlineDocumentText /> },
     ],
     admin: [
-        { to: "/officer", label: "Dashboard", icon: "📊" },
-        { to: "/officer/tickets", label: "Tickets", icon: "🎫" },
-        { to: "/officer/plans", label: "Implementation Plans", icon: "📋" },
-        { to: "/officer/map", label: "Live Map", icon: "🗺️" },
-        { to: "/officer/heatmap", label: "Heatmap", icon: "🔥" },
-        { to: "/officer/engineers", label: "Officials", icon: "👷" },
-        { to: "/officer/departments", label: "Departments", icon: "🏛️" },
-        { to: "/officer/manual-queue", label: "Manual Queue", icon: "📌" },
+        { to: "/officer", label: "Dashboard", icon: <HiOutlineChartBar /> },
+        { to: "/officer/tickets", label: "Tickets", icon: <HiOutlineTicket /> },
+        { to: "/officer/plans", label: "Implementation Plans", icon: <HiOutlineClipboardList /> },
+        { to: "/officer/map", label: "Live Map", icon: <HiOutlineMap /> },
+        { to: "/officer/heatmap", label: "Heatmap", icon: <HiOutlineFire /> },
+        { to: "/officer/engineers", label: "Officials", icon: <HiOutlineUserGroup /> },
+        { to: "/officer/departments", label: "Departments", icon: <HiOutlineLibrary /> },
+        { to: "/officer/manual-queue", label: "Manual Queue", icon: <HiOutlineTag /> },
     ],
 };
 
@@ -104,13 +111,13 @@ export default function Navbar() {
                     {["junior", "dept_head", "officer", "engineer", "admin"].includes(role) && (
                         <div style={{
                             marginTop: 8, fontSize: 10, fontWeight: 700,
-                            padding: "3px 8px", borderRadius: 4, display: "inline-block",
+                            padding: "3px 8px", borderRadius: 4, display: "inline-flex", alignItems: "center", gap: "4px",
                             background: mode === "urban" ? "#eff6ff" : "#f0fdf4",
                             color: mode === "urban" ? "#1e40af" : "#15803d",
                             border: `1px solid ${mode === "urban" ? "#bfdbfe" : "#bbf7d0"}`,
                             textTransform: "uppercase", letterSpacing: "0.5px"
                         }}>
-                            {mode === "urban" ? "🏙️ URBAN" : "🌾 RURAL"}
+                            {mode === "urban" ? <><HiOutlineOfficeBuilding /> URBAN</> : <><HiOutlineSun /> RURAL</>}
                         </div>
                     )}
                 </div>

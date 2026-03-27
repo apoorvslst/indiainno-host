@@ -246,7 +246,7 @@ export default function Schemes() {
                             {SECTORS.map(s => (
                                 <div
                                     key={s.key}
-                                    className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-6 hover:shadow-md hover:border-blue-400 transition-all cursor-pointer group"
+                                    className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded p-6 hover:shadow-md hover:border-blue-400 transition-all cursor-pointer group"
                                     onClick={() => setActiveSector(s.key)}
                                 >
                                     <h2 className="text-xl font-bold text-blue-900 group-hover:text-blue-600 mb-2">{s.label}</h2>
@@ -277,7 +277,7 @@ export default function Schemes() {
                         </div>
 
                         {displaySchemes.length === 0 ? (
-                            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center shadow-sm">
+                            <div className="bg-white rounded border border-gray-200 p-12 text-center shadow-sm">
                                 <p className="text-gray-500 font-medium">No recent {displaySector?.label} announcements found.</p>
                             </div>
                         ) : (
@@ -331,7 +331,7 @@ function SchemeCard({ scheme, sector, forceExpand = false }) {
     };
 
     return (
-        <div className="bg-white border border-[var(--color-border)] rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white border border-[var(--color-border)] rounded overflow-hidden shadow-sm hover:shadow-md transition-shadow">
             <div className="p-5 cursor-pointer" onClick={() => setExpanded(!expanded)}>
                 <div className="flex justify-between items-start mb-2">
                     <span className="text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-1 rounded">

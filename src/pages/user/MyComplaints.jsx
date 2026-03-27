@@ -4,7 +4,7 @@ import DashboardLayout from "../../components/DashboardLayout";
 import api from "../../utils/api";
 import { TICKET_STATUSES } from "../../data/departments";
 import toast from "react-hot-toast";
-import { HiOutlineShieldCheck, HiArrowRight } from "react-icons/hi";
+import { HiOutlineShieldCheck, HiArrowRight, HiOutlineSearchCircle, HiOutlineLocationMarker, HiOutlineLightBulb, HiOutlineBeaker, HiOutlineTrash, HiOutlineDocumentText, HiOutlinePhone } from "react-icons/hi";
 
 export default function MyComplaints() {
     const [complaints, setComplaints] = useState([]);
@@ -65,21 +65,24 @@ export default function MyComplaints() {
         : complaints.filter((c) => (c.ticket?.status || c.status || "Registered") === filter);
 
     const getCategoryIcon = (cat) => {
-        const iconMap = {
-            Pothole: "🕳️", Road_Damage: "🛣️", Streetlight: "💡", Power_Outage: "⚡",
-            Water_Leak: "💧", No_Water: "🚰", Garbage: "🗑️", Sewage_Overflow: "🚿",
-            Traffic_Signal: "🚦", Fire_Hazard: "🔥", Noise_Complaint: "📢",
-            Hospital_Issue: "🏥", Tree_Felling: "🌳",
+        const catMap = {
+            Pothole: <HiOutlineLocationMarker />, Road_Damage: <HiOutlineLocationMarker />,
+            Streetlight: <HiOutlineLightBulb />, Power_Outage: <HiOutlineLightBulb />,
+            Water_Leak: <HiOutlineBeaker />, No_Water: <HiOutlineBeaker />,
+            Garbage: <HiOutlineTrash />, Sewage_Overflow: <HiOutlineBeaker />,
+            Traffic_Signal: <HiOutlineLightBulb />, Fire_Hazard: <HiOutlineLightBulb />,
+            Noise_Complaint: <HiOutlineDocumentText />, Hospital_Issue: <HiOutlineDocumentText />,
+            Tree_Felling: <HiOutlineDocumentText />,
         };
-        return iconMap[cat] || "📋";
+        return catMap[cat] || <HiOutlineDocumentText />;
     };
 
     return (
         <DashboardLayout title="My Complaints" subtitle="Track all your submitted complaints">
             {/* ── Anti-Corruption Banner ── */}
-            <div className="mb-6 bg-white rounded-xl p-5 flex items-start sm:items-center justify-between flex-col sm:flex-row gap-4 border border-[var(--color-border)] shadow-sm animate-fadeInUp">
+            <div className="mb-6 bg-white rounded p-5 flex items-start sm:items-center justify-between flex-col sm:flex-row gap-4 border border-[var(--color-border)] shadow-sm animate-fadeInUp">
                 <div className="flex items-center gap-4 text-[var(--color-text)]">
-                    <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0 border border-green-100">
+                    <div className="w-12 h-12 rounded bg-green-50 flex items-center justify-center flex-shrink-0 border border-green-100">
                         <HiOutlineShieldCheck className="text-2xl text-green-600" />
                     </div>
                     <div>
@@ -92,7 +95,7 @@ export default function MyComplaints() {
                 </div>
                 <button
                     onClick={() => window.location.href = '/citizen/track-report'}
-                    className="flex-shrink-0 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg transition-colors shadow-sm flex items-center gap-2"
+                    className="flex-shrink-0 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded transition-colors shadow-sm flex items-center gap-2"
                 >
                     Track Secure Report <HiArrowRight />
                 </button>
@@ -124,7 +127,7 @@ export default function MyComplaints() {
                 <div className="flex justify-center py-16"><div className="spinner" /></div>
             ) : filteredComplaints.length === 0 ? (
                 <div className="card text-center py-16">
-                    <p className="text-4xl mb-3">🔍</p>
+                    <HiOutlineSearchCircle className="text-4xl mb-3 mx-auto text-[var(--color-primary)] opacity-50" />
                     <p className="text-[var(--color-text-muted)]">No complaints found</p>
                 </div>
             ) : (
@@ -136,7 +139,7 @@ export default function MyComplaints() {
                         return (
                             <div key={c.id} className="card animate-fadeInUp hover:bg-[var(--color-card-hover)]">
                                 <div className="flex items-start gap-4">
-                                    <div className="w-12 h-12 rounded-xl bg-[var(--color-primary)]/10 flex items-center justify-center text-2xl flex-shrink-0">
+                                    <div className="w-12 h-12 rounded bg-[var(--color-primary)]/10 flex items-center justify-center text-2xl flex-shrink-0 text-[var(--color-primary)]">
                                         {getCategoryIcon(category)}
                                     </div>
                                     <div className="flex-1 min-w-0">
@@ -145,7 +148,7 @@ export default function MyComplaints() {
                                             <h3 className="font-semibold">{category?.replace(/_/g, " ")}</h3>
                                             <span className={`badge status-${status.toLowerCase()}`}>{status.replace(/_/g, " ")}</span>
                                             <span className={`badge severity-${severity.toLowerCase()}`}>{severity}</span>
-                                            {c.ticket?.source === 'voice_call' && <span className="badge bg-purple-100 text-purple-700">📞 Voice</span>}
+                                            {c.ticket?.source === 'voice_call' && <span className="badge bg-purple-100 text-purple-700 flex items-center gap-1"><HiOutlinePhone /> Voice</span>}
                                         </div>
                                         <p className="text-sm text-[var(--color-text-muted)] mb-2 line-clamp-2">{c.transcriptOriginal}</p>
 

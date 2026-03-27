@@ -48,8 +48,8 @@ export default function ResolveTicket() {
             try {
                 const { data } = await api.get(`/tickets/master/${ticketId}`);
                 setTicket(data);
-                setForm(prev => ({ 
-                    ...prev, 
+                setForm(prev => ({
+                    ...prev,
                     progressPercent: data.progressPercent || 0,
                     currentPhase: data.currentPhase || 1
                 }));
@@ -80,7 +80,7 @@ export default function ResolveTicket() {
             if (ticket.lat && ticket.lng) {
                 const check = isWithinRange(ticket.lat, ticket.lng, loc.lat, loc.lng, 50);
                 if (check.withinRange) {
-                    toast.success(`Location verified! You are ${check.distance}m from site.`, { icon: '✅' });
+                    toast.success(`Location verified! You are ${check.distance}m from site.`);
                 } else {
                     toast.error(`Geo-fence Audit Failed: You are ${check.distance}m away. Must be within 50m to resolve.`);
                 }
@@ -101,12 +101,12 @@ export default function ResolveTicket() {
                 currentPhase: form.currentPhase,
                 juniorRemarks: form.notes
             };
-            
+
             // Add image if provided (for any progress level)
             if (form.imagePreview) {
                 updateData.progressImage = form.imagePreview;
             }
-            
+
             // Only require location for final completion (100%)
             if (form.progressPercent === 100) {
                 if (!form.lat || !form.lng) {
@@ -118,7 +118,7 @@ export default function ResolveTicket() {
                 updateData.resolutionLng = form.lng;
                 updateData.resolutionRemarks = form.notes;
                 updateData.resolutionImageUrl = form.imagePreview;
-                
+
                 if (ticket.lat && ticket.lng) {
                     const check = isWithinRange(ticket.lat, ticket.lng, form.lat, form.lng, 50);
                     if (!check.withinRange) {
@@ -130,11 +130,11 @@ export default function ResolveTicket() {
             }
 
             await api.put(`/tickets/master/${ticketId}`, updateData);
-            
-            const message = form.progressPercent === 100 
+
+            const message = form.progressPercent === 100
                 ? "Resolution submitted successfully! Awaiting verification."
                 : `Progress updated to ${form.progressPercent}% (Phase ${form.currentPhase})`;
-            
+
             toast.success(message);
             navigate("/junior");
         } catch (err) {
@@ -165,7 +165,7 @@ export default function ResolveTicket() {
                         </div>
 
                         {/* Phase Progress Tracker */}
-                        <div className="mb-4 p-4 bg-[var(--color-surface)] rounded-xl">
+                        <div className="mb-4 p-4 bg-[var(--color-surface)] rounded">
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-sm font-medium">Progress Timeline</span>
                                 <span className="text-xs text-[var(--color-text-muted)]">Current: Phase {form.currentPhase}</span>
@@ -174,13 +174,13 @@ export default function ResolveTicket() {
                                 {[1, 2, 3, 4, 5].map((phase) => (
                                     <div key={phase} className="flex-1">
                                         <div className={`h-2 rounded-full ${phase <= form.currentPhase ? 'bg-[var(--color-primary)]' : 'bg-gray-200'}`} />
-                                        <div className="text-[10px] text-center mt-1 text-[var(--color-text-muted)]">{PHASE_LABELS[phase-1]?.slice(0, 4)}</div>
+                                        <div className="text-[10px] text-center mt-1 text-[var(--color-text-muted)]">{PHASE_LABELS[phase - 1]?.slice(0, 4)}</div>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        <div className="p-4 bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] mb-4">
+                        <div className="p-4 bg-[var(--color-surface)] rounded border border-[var(--color-border)] mb-4">
                             <p className="text-sm font-medium mb-1 flex items-center gap-2"><HiOutlineLocationMarker className="text-[var(--color-primary)]" /> Target Area</p>
                             <code className="text-xs text-[var(--color-text-muted)]">Lat: {ticket.lat?.toFixed(5)} | Lng: {ticket.lng?.toFixed(5)}</code>
                         </div>
@@ -214,7 +214,7 @@ export default function ResolveTicket() {
                         <h3 className="text-lg font-bold">Update Progress</h3>
 
                         {/* Progress Slider - Any percentage allowed */}
-                        <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+                        <div className="p-4 rounded border border-[var(--color-border)] bg-[var(--color-surface)]">
                             <div className="flex justify-between items-center mb-3">
                                 <label className="text-sm font-medium">Progress: {form.progressPercent}%</label>
                                 <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
@@ -226,8 +226,8 @@ export default function ResolveTicket() {
                                 value={form.progressPercent}
                                 onChange={(e) => {
                                     const pct = parseInt(e.target.value);
-                                    setForm({ 
-                                        ...form, 
+                                    setForm({
+                                        ...form,
                                         progressPercent: pct,
                                         currentPhase: calculatePhase(pct)
                                     });
@@ -251,8 +251,8 @@ export default function ResolveTicket() {
                                     value={form.progressPercent}
                                     onChange={(e) => {
                                         const pct = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
-                                        setForm({ 
-                                            ...form, 
+                                        setForm({
+                                            ...form,
                                             progressPercent: pct,
                                             currentPhase: calculatePhase(pct)
                                         });
@@ -268,7 +268,7 @@ export default function ResolveTicket() {
                         </div>
 
                         {/* Phase Selection */}
-                        <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+                        <div className="p-4 rounded border border-[var(--color-border)] bg-[var(--color-surface)]">
                             <label className="text-sm font-medium mb-3 block">Current Phase</label>
                             <div className="flex gap-2">
                                 {[1, 2, 3, 4, 5].map((phase) => (
@@ -279,11 +279,10 @@ export default function ResolveTicket() {
                                             const pct = phase * 20;
                                             setForm({ ...form, currentPhase: phase, progressPercent: pct });
                                         }}
-                                        className={`flex-1 py-2 px-1 text-xs rounded-lg border ${
-                                            form.currentPhase === phase 
-                                                ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]' 
+                                        className={`flex-1 py-2 px-1 text-xs rounded-lg border ${form.currentPhase === phase
+                                                ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]'
                                                 : 'border-gray-200 hover:border-[var(--color-primary)]'
-                                        }`}
+                                            }`}
                                     >
                                         P{phase}
                                     </button>
@@ -292,14 +291,13 @@ export default function ResolveTicket() {
                         </div>
 
                         {/* Photo Upload - Available at ALL progress levels */}
-                        <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+                        <div className="p-4 rounded border border-[var(--color-border)] bg-[var(--color-surface)]">
                             <label className="text-sm font-medium mb-3 block flex items-center gap-2">
-                                <HiOutlinePhotograph /> 
+                                <HiOutlinePhotograph />
                                 {form.progressPercent === 100 ? 'Final Resolution Photo' : 'Progress Photo (Optional)'}
                             </label>
-                            <label className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-4 cursor-pointer transition-colors ${
-                                form.imagePreview ? 'border-[var(--color-primary)]' : 'border-[var(--color-border)] hover:border-[var(--color-primary)]'
-                            }`}>
+                            <label className={`flex flex-col items-center justify-center border-2 border-dashed rounded p-4 cursor-pointer transition-colors ${form.imagePreview ? 'border-[var(--color-primary)]' : 'border-[var(--color-border)] hover:border-[var(--color-primary)]'
+                                }`}>
                                 {form.imagePreview ? (
                                     <>
                                         <img src={form.imagePreview} alt="Progress" className="max-h-32 rounded-lg mb-2" />
@@ -319,7 +317,7 @@ export default function ResolveTicket() {
 
                         {/* Location - Only required for 100% */}
                         {form.progressPercent === 100 && (
-                            <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+                            <div className="p-4 rounded border border-[var(--color-border)] bg-[var(--color-surface)]">
                                 <label className="text-sm font-medium mb-3 block">Verify Location (Required for completion)</label>
                                 <button
                                     type="button"
@@ -339,23 +337,23 @@ export default function ResolveTicket() {
                         )}
 
                         {/* Remarks - Available at ALL progress levels */}
-                        <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+                        <div className="p-4 rounded border border-[var(--color-border)] bg-[var(--color-surface)]">
                             <label className="text-sm font-medium mb-2 block flex items-center gap-2">
-                                <HiOutlineClock /> 
+                                <HiOutlineClock />
                                 {form.progressPercent === 100 ? 'Final Remarks' : 'Progress Remarks'}
                             </label>
                             <textarea
                                 value={form.notes}
                                 onChange={e => setForm({ ...form, notes: e.target.value })}
                                 className="input-field min-h-[80px]"
-                                placeholder={form.progressPercent === 100 
-                                    ? "Describe the work done..." 
+                                placeholder={form.progressPercent === 100
+                                    ? "Describe the work done..."
                                     : "What progress was made? Any challenges?"
                                 }
                             />
                         </div>
 
-                        <button 
+                        <button
                             onClick={handleProgressUpdate}
                             disabled={submitting}
                             className="btn-primary w-full justify-center py-4 text-base"
@@ -370,7 +368,7 @@ export default function ResolveTicket() {
                         </button>
 
                         <p className="text-xs text-[var(--color-text-muted)] text-center">
-                            You can add photos and remarks at any progress level. 
+                            You can add photos and remarks at any progress level.
                             Final completion requires location verification.
                         </p>
                     </div>

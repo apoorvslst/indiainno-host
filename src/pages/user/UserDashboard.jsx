@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import DashboardLayout from "../../components/DashboardLayout";
 import api from "../../utils/api";
 import toast from "react-hot-toast";
-import { HiOutlinePlus, HiOutlineClipboardList, HiOutlineClock, HiOutlineCheckCircle, HiOutlinePhone } from "react-icons/hi";
+import { HiOutlinePlus, HiOutlineClipboardList, HiOutlineClock, HiOutlineCheckCircle, HiOutlinePhone, HiOutlineLocationMarker, HiOutlineLightBulb, HiOutlineBeaker, HiOutlineTrash, HiOutlineDocumentText } from "react-icons/hi";
 import { useAuth } from "../../contexts/AuthContext";
 
 export default function UserDashboard() {
@@ -59,7 +59,7 @@ export default function UserDashboard() {
             }
 
             const { data } = await api.post('/voice/call-me', {}, { timeout: 20000 });
-            toast.success(data.message || "Call initiated! Your phone will ring shortly.", { duration: 6000, icon: '📞' });
+            toast.success(data.message || "Call initiated! Your phone will ring shortly.", { duration: 6000 });
         } catch (err) {
             const msg =
                 err.response?.data?.message ||
@@ -106,12 +106,12 @@ export default function UserDashboard() {
                 </button>
             </div>
 
-            <div className="bg-[#ecfdf5] border border-[#a7f3d0] rounded-xl p-4 mb-8 animate-fadeInUp">
-                <p className="text-[#065f46] text-xs mb-2">
-                    <strong>📞 How it works:</strong> Click "Contact Authorities" and we'll call your registered phone number. Select your language, describe your complaint in any Indian language — our AI will automatically transcribe, classify the department, and register your complaint. It will appear on your dashboard instantly!
+            <div className="bg-[#ecfdf5] border border-[#a7f3d0] rounded p-4 mb-8 animate-fadeInUp">
+                <p className="text-[#065f46] text-xs mb-2 flex items-start gap-2">
+                    <HiOutlinePhone className="text-base flex-shrink-0 mt-0.5" /> <span><strong>How it works:</strong> Click "Contact Authorities" and we'll call your registered phone number. Select your language, describe your complaint in any Indian language — our AI will automatically transcribe, classify the department, and register your complaint. It will appear on your dashboard instantly!</span>
                 </p>
-                <p className="text-[#065f46] text-xs">
-                    <strong>☎️ Toll-Free Helpline:</strong> You can also dial <strong style={{ fontSize: '13px', letterSpacing: '0.5px' }}>918047360814</strong> directly from any phone. Our system will call you back and register your complaint automatically.
+                <p className="text-[#065f46] text-xs flex items-center gap-2">
+                    <HiOutlinePhone className="text-base flex-shrink-0" /> <span><strong>Toll-Free Helpline:</strong> You can also dial <strong style={{ fontSize: '13px', letterSpacing: '0.5px' }}>918047360814</strong> directly from any phone. Our system will call you back and register your complaint automatically.</span>
                 </p>
             </div>
 
@@ -133,7 +133,7 @@ export default function UserDashboard() {
                     <div className="flex justify-center py-8"><div className="spinner" /></div>
                 ) : recentComplaints.length === 0 ? (
                     <div className="text-center py-12">
-                        <p className="text-4xl mb-3">📋</p>
+                        <HiOutlineClipboardList className="text-4xl mb-3 mx-auto text-[var(--color-primary)] opacity-50" />
                         <p className="text-[var(--color-text-muted)]">No complaints yet. Submit your first one!</p>
                         <Link to="/citizen/submit" className="btn-primary mt-4 inline-flex">
                             <HiOutlinePlus /> Submit Complaint
@@ -142,12 +142,12 @@ export default function UserDashboard() {
                 ) : (
                     <div className="space-y-3">
                         {recentComplaints.map((c) => (
-                            <div key={c.id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-[var(--color-surface)] transition-colors">
-                                <div className="w-10 h-10 rounded-xl bg-[var(--color-primary)]/10 flex items-center justify-center text-lg flex-shrink-0">
-                                    {c.intentCategory === "Pothole" ? "🕳️" :
-                                        c.intentCategory === "Streetlight" ? "💡" :
-                                            c.intentCategory === "Water_Leak" ? "💧" :
-                                                c.intentCategory === "Garbage" ? "🗑️" : "📋"}
+                            <div key={c.id} className="flex items-center gap-4 p-3 rounded hover:bg-[var(--color-surface)] transition-colors">
+                                <div className="w-10 h-10 rounded bg-[var(--color-primary)]/10 flex items-center justify-center text-lg flex-shrink-0 text-[var(--color-primary)]">
+                                    {c.intentCategory === "Pothole" ? <HiOutlineLocationMarker /> :
+                                        c.intentCategory === "Streetlight" ? <HiOutlineLightBulb /> :
+                                            c.intentCategory === "Water_Leak" ? <HiOutlineBeaker /> :
+                                                c.intentCategory === "Garbage" ? <HiOutlineTrash /> : <HiOutlineDocumentText />}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="font-medium text-sm truncate">{c.intentCategory?.replace(/_/g, " ")} — {c.extractedLandmark || c.ticket?.landmark || "Unknown Location"}</p>
