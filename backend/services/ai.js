@@ -192,7 +192,7 @@ Respond with ONLY valid JSON (no empty values for required fields):
 
 /**
  * Legacy: Entity extraction (backward compatibility)
- */
+         */
 async function extractComplaintEntities(englishTranscript) {
     const result = await classifyComplaint(englishTranscript);
     return {
@@ -201,9 +201,81 @@ async function extractComplaintEntities(englishTranscript) {
     };
 }
 
+/**
+ * 3. Groq LLM - Extract Scheme Query from Voice Transcript
+ * Gets the core intent from a multilingual transcript.
+ */
+async function extractSchemeQuery(transcript) {
+    const prompt = `
+You are an AI assistant for a Government Schemes portal.
+A citizen has spoken this request (possibly in Hindi, English, or mixed): "${transcript}"
+
+Extract the specific government scheme or topic they are asking about.
+Translate the query to a clean English search term.
+If they just say general things like "tell me about schemes", return an empty query.
+
+Respond with ONLY valid JSON:
+{
+  "query": "The core english search term (e.g. 'PM Kisan Pension', 'MP Scholar', 'Mudra Loan')",
+  "language": "The original language detected (e.g. 'hi', 'en')"
+}
+`;
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [{ role: "user", content: prompt }],
+            model: "llama-3.1-8b-instant",
+            temperature: 0,
+            response_format: { type: "json_object" }
+        });
+        return JSON.parse(chatCompletion.choices[0].message.content);
+    } catch (err) {
+        console.error("[Groq Extract Scheme Error]", err.message);
+        return { query: transcript, language: "unknown" };
+    }
+}
+
+/**
+ * 4. Groq LLM - Generate Scheme Details
+ * Generates an overview, deadlines, and a safe link for a given scheme.
+ * Used when the PIB RSS feed lacks this detailed info.
+ */
+async function generateSchemeDetails(schemeName) {
+    const prompt = `
+You are an expert on Indian Government Schemes.
+Provide a concise, highly accurate brief about this scheme: "${schemeName}"
+
+Respond with ONLY valid JSON:
+{
+  "overview": "A 2-3 sentence simple explanation of the scheme and its benefits.",
+  "importantInfo": ["Key eligibility criteria 1", "Key benefit 2", "Required document 3"],
+  "deadline": "The typical deadline, or 'Ongoing/No specific deadline', or a specific date if known.",
+  "safeLink": "The official .gov.in or .nic.in URL to apply or read more (must be a safe government link)."
+}
+`;
+    try {
+        const chatCompletion = await groq.chat.completions.create({
+            messages: [{ role: "user", content: prompt }],
+            model: "llama-3.1-8b-instant",
+            temperature: 0,
+            response_format: { type: "json_object" }
+        });
+        return JSON.parse(chatCompletion.choices[0].message.content);
+    } catch (err) {
+        console.error("[Groq Generate Details Error]", err.message);
+        return {
+            overview: "Information currently unavailable.",
+            importantInfo: ["Please check official government sources for eligibility."],
+            deadline: "Unknown",
+            safeLink: "https://www.india.gov.in"
+        };
+    }
+}
+
 module.exports = {
     speechToText,
     speechToTextFromBuffer,
     classifyComplaint,
-    extractComplaintEntities
+    extractComplaintEntities,
+    extractSchemeQuery,
+    generateSchemeDetails
 };

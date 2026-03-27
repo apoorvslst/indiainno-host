@@ -127,6 +127,7 @@ const aiRoutes = require('./routes/ai_routes');
 const smsRoutes = require('./routes/sms');
 const implementationPlanRoutes = require('./routes/implementationPlans');
 const anticorruptionRoutes = require('./routes/anticorruption');
+const schemesRoutes = require('./routes/schemes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tickets', ticketRoutes);
@@ -136,6 +137,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/sms', smsRoutes);
 app.use('/api/implementation-plans', implementationPlanRoutes);
 app.use('/api/anticorruption', anticorruptionRoutes);
+app.use('/api/schemes', schemesRoutes);
 
 // 404 handler for unknown routes
 app.use((req, res) => {

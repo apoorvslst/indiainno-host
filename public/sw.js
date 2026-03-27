@@ -37,17 +37,31 @@ self.addEventListener('fetch', (event) => {
     if (request.url.includes('/api/')) return;
 
     event.respondWith(
-        caches.match(request).then((cached) => {
-            const fetchPromise = fetch(request).then((response) => {
-                // Cache successful responses
-                if (response.ok) {
+        caches.match(request).then(async (cached) => {
+            if (cached) {
+                // Return cached version immediately, but fetch in background to update
+                fetch(request).then(response => {
+                    if (response.ok && request.url.startsWith('http')) {
+                        caches.open(CACHE_NAME).then(cache => cache.put(request, response));
+                    }
+                }).catch(() => { });
+                return cached;
+            }
+
+            try {
+                const response = await fetch(request);
+                if (response.ok && request.url.startsWith('http')) {
                     const clone = response.clone();
                     caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
                 }
                 return response;
-            }).catch(() => cached); // Fallback to cache on network error
-
-            return cached || fetchPromise;
+            } catch (err) {
+                // If network fails and no direct cache, fallback to index for SPA navigation
+                if (request.mode === 'navigate') {
+                    return caches.match('/');
+                }
+                return Response.error();
+            }
         })
     );
 });

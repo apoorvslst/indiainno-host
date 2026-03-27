@@ -12,6 +12,7 @@ const NAV_LINKS = {
         { to: "/citizen/map", label: "City Map", icon: "🗺️" },
         { to: "/citizen/anonymous-report", label: "Anti-Corruption", icon: "🛡️" },
         { to: "/citizen/track-report", label: "Track AC Report", icon: "🔍" },
+        { to: "/schemes", label: "Govt Schemes", icon: "🏛️" },
     ],
     user: [
         { to: "/citizen", label: "Dashboard", icon: "📊" },
@@ -20,6 +21,7 @@ const NAV_LINKS = {
         { to: "/citizen/map", label: "City Map", icon: "🗺️" },
         { to: "/citizen/anonymous-report", label: "Anti-Corruption", icon: "🛡️" },
         { to: "/citizen/track-report", label: "Track AC Report", icon: "🔍" },
+        { to: "/schemes", label: "Govt Schemes", icon: "🏛️" },
     ],
     junior: [
         { to: "/junior", label: "Dashboard", icon: "📊" },
