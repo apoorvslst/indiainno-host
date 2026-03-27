@@ -110,7 +110,7 @@ export default function App() {
       <Route path="/officer/engineers" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><ManageEngineers /></ProtectedRoute>} />
       <Route path="/officer/departments" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><ManageDepartments /></ProtectedRoute>} />
       <Route path="/officer/map" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><MapView /></ProtectedRoute>} />
-      <Route path="/officer/heatmap" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><HeatmapView /></ProtectedRoute>} />
+      <Route path="/officer/heatmap" element={<ProtectedRoute allowedRoles={["officer", "admin", "dept_head", "junior", "engineer"]}><HeatmapView /></ProtectedRoute>} />
       <Route path="/officer/manual-queue" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><ManualQueue /></ProtectedRoute>} />
       <Route path="/officer/reports" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><OfficerReports /></ProtectedRoute>} />
       <Route path="/officer/plans" element={<ProtectedRoute allowedRoles={["officer", "admin"]}><ImplementationPlansList /></ProtectedRoute>} />

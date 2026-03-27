@@ -201,7 +201,7 @@ router.post('/call-me', protect, async (req, res) => {
         } else if (err.code === 21211 || err.code === 21214) {
             userMessage = 'Invalid phone number. Please update your phone number in profile (e.g. +919876543210).';
             errorCode = 'INVALID_PHONE';
-        } else if (err.code === 21608 || err.code === 21610) {
+        } else if (err.code === 21608 || err.code === 21610 || err.code === 21219) {
             userMessage = 'This phone number is not verified on Twilio trial. Verify it at twilio.com/console/phone-numbers/verified.';
             errorCode = 'UNVERIFIED_PHONE';
         } else if (err.message?.includes('not a valid phone number')) {

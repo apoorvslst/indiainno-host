@@ -58,11 +58,12 @@ async function checkNgrokRunning() {
 async function startNgrok() {
     return new Promise((resolve, reject) => {
         log('Starting ngrok tunnel...', 'blue');
-        
-        ngrokProcess = spawn('ngrok', [
+
+        const cmd = process.platform === 'win32' ? 'ngrok.cmd' : 'ngrok';
+        ngrokProcess = spawn(cmd, [
             'http',
+            CONFIG.NGROK_PORT.toString(),
             '--region', CONFIG.NGROK_REGION,
-            '--addr', CONFIG.NGROK_PORT,
             '--log', 'stdout'
         ], {
             stdio: ['ignore', 'pipe', 'pipe'],
@@ -78,6 +79,7 @@ async function startNgrok() {
 
         ngrokProcess.stderr.on('data', (data) => {
             const output = data.toString();
+            log(`[Ngrok Stderr]: ${output.trim()}`, 'yellow');
             if (output.includes('started tunnel') || output.includes('url=')) {
                 log('Ngrok tunnel established', 'green');
             }
@@ -108,12 +110,12 @@ async function getNgrokUrl() {
     if (!tunnels) {
         return null;
     }
-    
+
     const httpsTunnel = tunnels.tunnels.find(t => t.proto === 'https');
     if (!httpsTunnel) {
         return null;
     }
-    
+
     return httpsTunnel.public_url.replace(/\/+$/, '');
 }
 
@@ -134,9 +136,9 @@ function updateEnvFiles(baseUrl) {
 
     envPaths.forEach(envPath => {
         if (!fs.existsSync(envPath)) return;
-        
+
         let content = fs.readFileSync(envPath, 'utf8');
-        
+
         Object.entries(envVars).forEach(([key, value]) => {
             const regex = new RegExp(`^${key}=.*$`, 'm');
             if (regex.test(content)) {
@@ -145,10 +147,10 @@ function updateEnvFiles(baseUrl) {
                 content += `\n${key}=${value}`;
             }
         });
-        
+
         fs.writeFileSync(envPath, content);
     });
-    
+
     process.env.WEBHOOK_BASE_URL = baseUrl;
     process.env.VOICE_WEBHOOK = envVars.VOICE_WEBHOOK;
     process.env.SMS_WEBHOOK = envVars.SMS_WEBHOOK;
@@ -166,17 +168,17 @@ async function updateTwilioWebhook(baseUrl) {
 
     try {
         log('Updating Twilio webhook...', 'blue');
-        
+
         const auth = Buffer.from(`${TWILIO_SID}:${TWILIO_AUTH}`).toString('base64');
-        
+
         const numbers = await axios.get(
             `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/IncomingPhoneNumbers.json`,
             { headers: { Authorization: `Basic ${auth}` } }
         );
 
         const myNumber = numbers.data.incoming_phone_numbers.find(
-            n => n.phone_number === TWILIO_NUMBER || 
-                 n.phone_number.includes(TWILIO_NUMBER.replace('+', ''))
+            n => n.phone_number === TWILIO_NUMBER ||
+                n.phone_number.includes(TWILIO_NUMBER.replace('+', ''))
         );
 
         if (!myNumber) {
@@ -185,7 +187,7 @@ async function updateTwilioWebhook(baseUrl) {
         }
 
         const voiceUrl = `${baseUrl}/api/voice/incoming`;
-        
+
         await axios.post(
             `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/IncomingPhoneNumbers/${myNumber.sid}.json`,
             new URLSearchParams({
@@ -194,17 +196,17 @@ async function updateTwilioWebhook(baseUrl) {
                 sms_url: `${baseUrl}/api/sms/incoming`,
                 sms_method: 'POST'
             }),
-            { 
-                headers: { 
-                    Authorization: `Basic ${auth}`, 
-                    'Content-Type': 'application/x-www-form-urlencoded' 
-                } 
+            {
+                headers: {
+                    Authorization: `Basic ${auth}`,
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
             }
         );
 
         log(`✅ Twilio webhook updated: ${voiceUrl}`, 'green');
         return { success: true, url: voiceUrl };
-        
+
     } catch (err) {
         log(`Twilio error: ${err.response?.data?.message || err.message}`, 'red');
         return { success: false, error: err.message };
@@ -223,9 +225,9 @@ async function updateExotelWebhook(baseUrl) {
 
     try {
         log('Updating Exotel webhook...', 'blue');
-        
+
         const voiceUrl = `${baseUrl}/api/voice/incoming`;
-        
+
         const response = await axios.put(
             `https://api.exotel.com/v1/Accounts/${EXOTEL_SID}/apps/${EXOTEL_APP_ID}`,
             {
@@ -246,7 +248,7 @@ async function updateExotelWebhook(baseUrl) {
 
         log(`✅ Exotel webhook updated: ${voiceUrl}`, 'green');
         return { success: true, url: voiceUrl };
-        
+
     } catch (err) {
         log(`Exotel error: ${err.response?.data?.message || err.message}`, 'red');
         return { success: false, error: err.message };
@@ -265,9 +267,9 @@ async function updateExotelManualPortal(baseUrl) {
 
     try {
         log('Updating Exotel Manual Number webhook...', 'blue');
-        
+
         const voiceUrl = `${baseUrl}/api/voice/incoming`;
-        
+
         const response = await axios.put(
             `https://api.exotel.com/v1/Accounts/${EXOTEL_SID}/incomingphonenumbers/${EXOTEL_WEBHOOK_NUMBER}`,
             {
@@ -287,7 +289,7 @@ async function updateExotelManualPortal(baseUrl) {
 
         log(`✅ Exotel Manual webhook updated: ${voiceUrl}`, 'green');
         return { success: true, url: voiceUrl };
-        
+
     } catch (err) {
         log(`Exotel Manual error: ${err.response?.data?.message || err.message}`, 'red');
         return { success: false, error: err.message };
@@ -298,25 +300,25 @@ async function updateAllWebhooks(baseUrl) {
     log(`\n${'='.repeat(40)}`, 'cyan');
     log(`Updating all webhooks to: ${baseUrl}`, 'blue');
     log('='.repeat(40), 'cyan');
-    
+
     updateEnvFiles(baseUrl);
-    
+
     const results = {
         twilio: await updateTwilioWebhook(baseUrl),
         exotel: await updateExotelWebhook(baseUrl),
         exotelManual: await updateExotelManualPortal(baseUrl)
     };
-    
+
     log('\n✅ Webhook update complete!', 'green');
     return results;
 }
 
 async function monitorNgrok() {
     if (!isRunning) return;
-    
+
     try {
         const newUrl = await getNgrokUrl();
-        
+
         if (newUrl && newUrl !== currentUrl) {
             log(`URL changed: ${currentUrl} → ${newUrl}`, 'yellow');
             currentUrl = newUrl;
@@ -337,26 +339,26 @@ async function startNgrokManager() {
 
     try {
         let tunnels = await checkNgrokRunning();
-        
+
         if (!tunnels || !tunnels.tunnels || tunnels.tunnels.length === 0) {
             log('Ngrok not running, starting...', 'yellow');
             tunnels = await startNgrok();
         }
-        
+
         currentUrl = await getNgrokUrl();
-        
+
         if (currentUrl) {
             log(`Current URL: ${currentUrl}`, 'green');
             await updateAllWebhooks(currentUrl);
         } else {
             log('No HTTPS tunnel available yet', 'yellow');
         }
-        
-        log(`\nMonitoring for URL changes every ${CONFIG.CHECK_INTERVAL/1000}s...`, 'blue');
-        
+
+        log(`\nMonitoring for URL changes every ${CONFIG.CHECK_INTERVAL / 1000}s...`, 'blue');
+
         isRunning = true;
         setInterval(monitorNgrok, CONFIG.CHECK_INTERVAL);
-        
+
         return {
             url: currentUrl,
             stop: () => {
@@ -366,7 +368,7 @@ async function startNgrokManager() {
                 }
             }
         };
-        
+
     } catch (err) {
         log(`Warning: ${err.message} - webhook auto-update disabled`, 'yellow');
         return null;

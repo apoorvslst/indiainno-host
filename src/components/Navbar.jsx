@@ -26,14 +26,17 @@ const NAV_LINKS = {
     junior: [
         { to: "/junior", label: "Dashboard", icon: "📊" },
         { to: "/junior/plans", label: "Implementation Plans", icon: "📋" },
+        { to: "/officer/heatmap", label: "Heatmap", icon: "🔥" },
     ],
     engineer: [
         { to: "/junior", label: "Dashboard", icon: "📊" },
         { to: "/junior/plans", label: "Implementation Plans", icon: "📋" },
+        { to: "/officer/heatmap", label: "Heatmap", icon: "🔥" },
     ],
     dept_head: [
         { to: "/dept-head", label: "Dashboard", icon: "📊" },
         { to: "/dept-head/plans", label: "Implementation Plans", icon: "📋" },
+        { to: "/officer/heatmap", label: "Heatmap", icon: "🔥" },
         { to: "/dept-head/pending", label: "Pending Cases", icon: "⏳" },
         { to: "/dept-head/sla", label: "SLA Cares", icon: "⚠️" },
         { to: "/dept-head/juniors", label: "My Juniors", icon: "👷" },
