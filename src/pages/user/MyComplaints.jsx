@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import DashboardLayout from "../../components/DashboardLayout";
 import api from "../../utils/api";
 import { TICKET_STATUSES } from "../../data/departments";
@@ -197,6 +198,17 @@ export default function MyComplaints() {
                                                         </p>
                                                     </div>
                                                 </div>
+
+                                                {/* VIEW IMPLEMENTATION PLAN LINK */}
+                                                {c.ticket?._id && (
+                                                    <Link
+                                                        to={`/citizen/plan/${c.ticket._id}`}
+                                                        className="ml-auto px-3 py-1.5 rounded-md text-xs font-semibold"
+                                                        style={{ backgroundColor: '#1e3a8a', color: '#fff' }}
+                                                    >
+                                                        📋 View Plan
+                                                    </Link>
+                                                )}
                                             </div>
                                         </div>
 

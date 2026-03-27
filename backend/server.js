@@ -88,6 +88,48 @@ app.get('/api/config', (req, res) => {
     });
 });
 
+// Webhook status endpoint
+app.get('/api/webhook/status', async (req, res) => {
+    try {
+        const axios = require('axios');
+        const tunnels = await axios.get('http://127.0.0.1:4040/api/tunnels', { timeout: 2000 });
+        const httpsTunnel = tunnels.data.tunnels?.find(t => t.proto === 'https');
+
+        res.json({
+            running: !!httpsTunnel,
+            url: httpsTunnel?.public_url?.replace(/\/+$/, '') || null,
+            tunnels: tunnels.data.tunnels || []
+        });
+    } catch (err) {
+        res.json({
+            running: false,
+            url: null,
+            error: err.message
+        });
+    }
+});
+
+// Manual webhook update endpoint
+app.post('/api/webhook/update', async (req, res) => {
+    try {
+        const { forceUpdateWebhooks } = require('./services/ngrokManager');
+        const results = await forceUpdateWebhooks();
+
+        if (results.error) {
+            return res.status(500).json(results);
+        }
+
+        res.json({
+            success: true,
+            ...results
+        });
+    } catch (err) {
+        res.status(500).json({
+            error: err.message
+        });
+    }
+});
+
 // ── Backward-compatible /initiate-call alias ──
 // Frontend may call POST /initiate-call directly; forward to exotel service.
 app.post('/initiate-call', async (req, res) => {
@@ -153,10 +195,17 @@ app.use((err, req, res, _next) => {
 // CronService for automated SLA deductions
 const { startCronService } = require('./services/cronService');
 
+// Ngrok Webhook Manager - auto-updates webhooks when URL changes
+const { startNgrokManager } = require('./services/ngrokManager');
+
 // Connect DB then start server
 const PORT = process.env.PORT || 5000;
-connectDB().then(() => {
+connectDB().then(async () => {
     startCronService();
+
+    // Start Ngrok Webhook Manager
+    const ngrokManager = await startNgrokManager();
+
     app.listen(PORT, () => {
         console.log(`\n✅ [CivicSync] Server running on http://localhost:${PORT}`);
         console.log(`📊 [API Routes]`);
@@ -188,6 +237,9 @@ connectDB().then(() => {
         console.log(` PUT  /api/implementation-plans/:planId/final-verify`);
         console.log(`📡 [Provider] ${telephonyAdapter.getActiveProvider() || 'None configured'}`);
         console.log(`☎️  [Helpline] ${telephonyAdapter.getHelplineNumber()}`);
-        console.log(`🔗 [Webhook]  ${process.env.WEBHOOK_BASE_URL || 'http://localhost:5000'}\n`);
+        console.log(`🔗 [Webhook]  ${process.env.WEBHOOK_BASE_URL || 'http://localhost:5000'}`);
+        console.log(`🌐 [Ngrok]   Auto-updates webhooks every 15s`);
+        console.log(`📌 [Endpoints] GET /api/webhook/status → Check ngrok`);
+        console.log(`              POST /api/webhook/update → Force update\n`);
     });
 });

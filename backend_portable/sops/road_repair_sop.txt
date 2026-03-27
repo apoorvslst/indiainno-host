@@ -1,0 +1,201 @@
+MUNICIPAL ENGINEERING STANDARD OPERATING PROCEDURE
+Road Surface Maintenance and Pothole Repair
+Document: MCD-SOP-ROAD-001 | Version 2.4 | April 2024
+Issuing Authority: Public Works Department, Engineering Division
+
+================================================================
+SECTION 1 — SCOPE AND APPLICABILITY
+================================================================
+This SOP applies to all road surface defects including potholes, alligator cracking,
+rutting, edge failures, and surface depressions on municipal roads classified as:
+- Primary Arterial Roads (carriageway width > 7.5m)
+- Secondary Arterial Roads (carriageway width 5.5m – 7.5m)
+- Local Roads and Lanes (carriageway width < 5.5m)
+
+Equivalent Indian Standards: IRC:SP:16 (Surface Evenness of Highway Pavements),
+MoRTH Specifications for Road and Bridge Works (5th Revision), IRC:37-2018.
+
+================================================================
+SECTION 2 — DEFECT CLASSIFICATION AND SEVERITY
+================================================================
+2.1 Severity Levels
+LOW SEVERITY: Pothole diameter < 15cm OR depth < 3cm. No immediate safety risk.
+Repair timeline: Within 72 hours of reporting.
+
+MEDIUM SEVERITY: Pothole diameter 15–40cm OR depth 3–10cm. Vehicle damage risk.
+Repair timeline: Within 48 hours of reporting.
+
+HIGH SEVERITY: Pothole diameter > 40cm OR depth > 10cm OR on high-traffic arterial route.
+Repair timeline: Within 24 hours of reporting. Traffic management mandatory.
+
+CRITICAL SEVERITY: Structural failure, sinkhole formation, or pavement collapse.
+Repair timeline: Immediate response within 6 hours. Emergency declaration required.
+Escalate to Superintending Engineer immediately.
+
+2.2 Defect Measurement Protocol
+All defects must be measured using:
+- Steel tape for diameter/length/width
+- Depth gauge or ruler for depth measurement
+- Photographic evidence (min. 3 photos: aerial, side, scaled reference)
+Document in Form PWD-DR-07 before repair work begins.
+
+================================================================
+SECTION 3 — PRE-REPAIR SAFETY REQUIREMENTS
+================================================================
+3.1 Traffic Management
+All repair sites require Traffic Management Plan (TMP) per IRC:67-2012.
+Minimum setup:
+- Advance warning signs: 50m from site (urban), 100m (highway)
+- Road closed/lane closed signs at site entry
+- Cones/delineators at 5m intervals for site boundary
+- At least one traffic marshal for sites on roads with AADT > 5000 vpd
+
+3.2 Personal Protective Equipment (PPE) — Mandatory for all crew
+- High-visibility vest (Class 2 minimum, EN ISO 20471)
+- Hard hat (IS:2925 compliant)
+- Safety boots with steel toecap and midsole (IS:15298)
+- Work gloves for material handling
+- Eye protection when using cutting equipment or compactors
+
+3.3 Hazard Assessment
+Before commencing work, Site Engineer must assess:
+a) Underground utilities: contact utility departments for clearance (min. 48h notice)
+b) Traffic flow and sight distance
+c) Overhead obstructions
+d) Proximity to drainage — prevent asphalt from entering storm drains
+e) Weather: Do NOT apply bituminous material if rain expected within 12 hours
+   or surface temperature below 10°C or above 45°C
+
+================================================================
+SECTION 4 — REPAIR MATERIALS AND SPECIFICATIONS
+================================================================
+4.1 Cold Mix Asphalt (Temporary Repair)
+Use when: emergency/interim repair, weather prohibits hot mix, remote location.
+Specification: Emulsion-based cold mix per IRC:SP:100-2014
+Application temperature: Ambient (5°C – 45°C)
+Compaction: Minimum 10 passes with plate compactor (300kg min.)
+Expected life: 3–6 months. Must be followed by permanent repair.
+Cost estimate: INR 8,000 – 12,000 per tonne (2024 rates)
+
+4.2 Dense Bituminous Macadam (DBM) — Permanent Base Course
+Layer thickness: 50mm minimum
+Bitumen grade: VG-30 for plains, VG-40 for high-altitude/temperature zones
+Mix temperature: 155°C – 170°C (at plant)
+Laying temperature: Minimum 130°C
+Compaction: Steel roller (8-10 tonne) to achieve minimum 92% Marshall density
+Cost estimate: INR 6,500 – 9,500 per tonne (2024 rates)
+
+4.3 Bituminous Concrete (BC) — Surface Course
+Layer thickness: 25–40mm
+Bitumen grade: VG-30
+Mix design: Marshall method per MoRTH Section 500
+Laying temperature: Minimum 125°C
+Compaction sequence: Breakdown roller (10t) → Intermediate (8t) → Finish (8t)
+Minimum passes: 8 breakdown, 4 intermediate, 2 finish
+Cost estimate: INR 9,000 – 14,000 per tonne (2024 rates)
+
+4.4 Tack Coat
+Apply before each bituminous layer. CSS-1 emulsion @ 0.25–0.30 kg/m²
+Allow tack coat to break fully before laying mix.
+
+================================================================
+SECTION 5 — STANDARD REPAIR PROCEDURE (POTHOLE)
+================================================================
+5.1 Site Assessment (Duration: 1–2 hours)
+Step 1: Erect traffic management per Section 3.1
+Step 2: Measure and document defect per Section 2.2
+Step 3: Assess depth — determine if sub-base failure is present
+Step 4: Mark repair area: rectangular/square cuts at least 30cm beyond defect boundary
+Step 5: Photograph completed assessment
+
+5.2 Excavation and Preparation (Duration: 2–4 hours)
+Step 1: Cut edges vertically using road saw (or cold milling machine for large areas)
+        Cut lines must be straight and perpendicular to road axis
+Step 2: Remove all loose/failed material using jackhammer, pneumatic drill, or excavator
+Step 3: Remove spoil to approved disposal site (not road verge)
+Step 4: Compact subgrade to 95% Proctor density (MoRTH Clause 305.3.3)
+Step 5: If base failure detected: add granular sub-base (GSB) layer 150mm, compact
+Step 6: Apply prime coat (MC-30) @ 0.6–1.0 kg/m² on granular base
+
+5.3 Base Course Repairs (Duration: 2–6 hours)
+Step 1: Lay DBM in maximum 75mm uncompacted lifts
+Step 2: Compact immediately — do not allow temperature to drop below 130°C
+Step 3: Check for voids and irregularities; add material as needed
+Step 4: Apply tack coat before surface course
+
+5.4 Surface Course Application (Duration: 2–4 hours)
+Step 1: Apply bituminous concrete surface course (Section 4.3)
+Step 2: Level to match existing road profile ± 3mm (check with 3m straight edge)
+Step 3: Compact per sequence in Section 4.3
+Step 4: Allow to cool to ambient temperature before opening to traffic (minimum 2 hours)
+
+5.5 Quality Inspection (Duration: 1–2 hours)
+Step 1: Visual inspection for surface texture, aggregate distribution
+Step 2: Ride quality check with 3m straight edge — maximum unevenness: 5mm
+Step 3: Core sample (one per 500 m² of repair area) for density testing
+Step 4: Complete Form PWD-QC-12 (Quality Control Record)
+Step 5: Obtain sign-off from Site Engineer and Quality Inspector
+
+5.6 Site Reinstatement
+Remove all traffic management equipment
+Clean road surface of all debris, bitumen spills
+Remove temporary signage
+Photograph completed repair (minimum 3 photos)
+
+================================================================
+SECTION 6 — EQUIPMENT LIST
+================================================================
+Standard equipment for pothole repair (medium severity):
+- Road saw or angle grinder with diamond blade
+- Pneumatic drill (jackhammer) or small excavator
+- Air compressor
+- Bituminous mix transport vehicle (insulated body)
+- Plate compactor (300–600 kg) for small patches
+- Tandem roller (8–10 tonne) for large patches
+- Traffic management equipment (cones, signs, barriers)
+- Tack coat sprayer or watering can
+- Straight edge (3m)
+- Depth gauge
+
+================================================================
+SECTION 7 — CREW COMPOSITION
+================================================================
+Minimum crew for medium-severity pothole repair:
+- 1 × Site Engineer (Class I PWD)
+- 1 × Foreman
+- 4–6 × Unskilled workers (operators, helpers)
+- 1 × Quality Inspector (for permanent repair)
+- Traffic marshals as per TMP
+
+================================================================
+SECTION 8 — COST ESTIMATION GUIDELINES
+================================================================
+Approximate cost ranges (2024, Delhi NCR):
+Small patch (<1 m²): INR 8,000 – 15,000
+Medium patch (1–5 m²): INR 15,000 – 55,000
+Large repair (5–20 m²): INR 55,000 – 2,50,000
+Full road resurfacing (per lane-km): INR 25,00,000 – 45,00,000
+
+Include in cost estimate:
+- Materials (asphalt, tack coat, GSB)
+- Labour (daily wages per Schedule of Rates)
+- Equipment hire (road saw, roller, compactor)
+- Traffic management hire
+- Disposal of excavated material
+- Contingency: 10% of direct cost
+
+================================================================
+SECTION 9 — REPORTING AND RECORDS
+================================================================
+All work orders must reference the original complaint ticket number.
+Forms required:
+- Form PWD-DR-07: Defect Record (before repair)
+- Form PWD-MT-03: Material Receipt and Usage
+- Form PWD-QC-12: Quality Control Record (after repair)
+- Form PWD-WC-01: Work Completion Certificate
+
+Records retained for minimum 7 years per RTI Act requirements.
+
+================================================================
+END OF SOP MCD-SOP-ROAD-001
+================================================================

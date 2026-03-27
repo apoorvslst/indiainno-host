@@ -231,57 +231,77 @@ async function createComplaintFromData(data, user = null) {
   if (isNew && matchingTicket.level) {
     try {
       const ImplementationPlan = require('../models/ImplementationPlan');
-      const { getPlanTemplate } = require('../data/implementationPlans');
       
       const existingPlan = await ImplementationPlan.findOne({ masterTicketId: matchingTicket._id });
       if (!existingPlan) {
-        const template = getPlanTemplate(matchingTicket.primaryCategory);
-        const steps = template.steps.map(step => ({
-          ...step,
-          status: 'pending',
-          beforePhotos: [],
-          duringPhotos: [],
-          afterPhotos: [],
-          juniorRemarks: '',
-          seniorRemarks: ''
-        }));
+        // Try SOP-based plan generation first (backend_portable)
+        const { generatePlanFromSOP, checkSOPServiceHealth } = require('../services/sopPlanGenerator');
         
-        const materials = template.materials || [];
-        const totalCost = materials.reduce((sum, m) => sum + (m.estimatedCost || 0), 0);
+        const sopHealth = await checkSOPServiceHealth();
+        let planData = null;
         
-        const plan = new ImplementationPlan({
-          masterTicketId: matchingTicket._id,
-          ticketNumber: matchingTicket.ticketNumber,
-          category: matchingTicket.primaryCategory,
-          subCategory: matchingTicket.subCategory || '',
-          level: matchingTicket.level,
-          severity: matchingTicket.severity,
-          department: matchingTicket.department,
-          zone: matchingTicket.zone || '',
-          wardNumber: matchingTicket.wardNumber || '',
-          locality: matchingTicket.locality || '',
-          landmark: matchingTicket.landmark || '',
-          title: template.title,
-          description: template.description,
-          problemAnalysis: template.problemAnalysis,
-          steps: steps,
-          totalEstimatedHours: template.estimatedHours,
-          totalEstimatedCost: totalCost,
-          primaryMaterials: materials,
-          primaryEquipment: template.equipment || [],
-          currentStage: 'ai_generated',
-          status: 'draft',
-          aiGeneratedAt: new Date(),
-          aiGeneratedBy: 'CivicSync AI',
-          approvalHistory: [{
-            action: 'ai_generated',
-            performedBy: null,
-            performedByRole: 'ai',
-            remarks: `AI-generated implementation plan for ${matchingTicket.primaryCategory} complaint (Level ${matchingTicket.level})`,
-            timestamp: new Date()
-          }]
-        });
+        if (sopHealth.running) {
+          console.log(`[Auto-Plan] SOP service running, generating plan for ${matchingTicket.primaryCategory}...`);
+          const sopResult = await generatePlanFromSOP(matchingTicket);
+          
+          if (sopResult.success) {
+            planData = sopResult.plan;
+            console.log(`[Auto-Plan] SOP plan generated successfully for ${matchingTicket.ticketNumber}`);
+          } else {
+            console.warn(`[Auto-Plan] SOP generation failed: ${sopResult.error}, using fallback template`);
+          }
+        } else {
+          console.log(`[Auto-Plan] SOP service not running (${sopHealth.error || 'not available'}), using fallback template`);
+        }
         
+        // If SOP failed or not available, use fallback template
+        if (!planData) {
+          const { getPlanTemplate } = require('../data/implementationPlans');
+          const template = getPlanTemplate(matchingTicket.primaryCategory);
+          
+          planData = {
+            masterTicketId: matchingTicket._id,
+            ticketNumber: matchingTicket.ticketNumber,
+            category: matchingTicket.primaryCategory,
+            subCategory: matchingTicket.subCategory || '',
+            level: matchingTicket.level,
+            severity: matchingTicket.severity,
+            department: matchingTicket.department,
+            zone: matchingTicket.zone || '',
+            wardNumber: matchingTicket.wardNumber || '',
+            locality: matchingTicket.locality || '',
+            landmark: matchingTicket.landmark || '',
+            title: template.title,
+            description: template.description,
+            problemAnalysis: template.problemAnalysis,
+            steps: template.steps.map(step => ({
+              ...step,
+              status: 'pending',
+              beforePhotos: [],
+              duringPhotos: [],
+              afterPhotos: [],
+              juniorRemarks: '',
+              seniorRemarks: ''
+            })),
+            totalEstimatedHours: template.estimatedHours,
+            totalEstimatedCost: template.materials?.reduce((sum, m) => sum + (m.estimatedCost || 0), 0) || 0,
+            primaryMaterials: template.materials || [],
+            primaryEquipment: template.equipment || [],
+            currentStage: 'ai_generated',
+            status: 'draft',
+            aiGeneratedAt: new Date(),
+            aiGeneratedBy: 'CivicSync AI (Template)',
+            approvalHistory: [{
+              action: 'ai_generated',
+              performedBy: null,
+              performedByRole: 'ai',
+              remarks: `Implementation plan for ${matchingTicket.primaryCategory} complaint (Level ${matchingTicket.level})`,
+              timestamp: new Date()
+            }]
+          };
+        }
+        
+        const plan = new ImplementationPlan(planData);
         await plan.save();
         matchingTicket.implementationPlanId = plan._id;
         await matchingTicket.save();
